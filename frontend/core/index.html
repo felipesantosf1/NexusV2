@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- CSS DA MATRIZ -->
+    <link rel="stylesheet" href="../raci/raci_style.css">
+
+    <!-- CSS DO CRONOGRAMA -->
+    <link rel="stylesheet" href="../gantt/gantt_style.css">
+
+    <!-- CSS PRINCIPAL -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- ICONS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- ICONS -->
+
+    <!-- FONT -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FONT -->
+
+    <title>Nexus</title>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar collapsed" id="sidebar">
+        <div class="sidebar-header">
+
+            <button class="toggle" id="toggleSidebar">
+                <svg class="icon" viewBox="0 0 640 640" aria-hidden="true">
+                    <path d="M96 160C96 142.3 110.3 128 128 128L512 128C529.7 128 544 142.3 544 160C544 177.7 529.7 192 512 192L128 192C110.3 192 96 177.7 96 160zM96 320C96 302.3 110.3 288 128 288L512 288C529.7 288 544 302.3 544 320C544 337.7 529.7 352 512 352L128 352C110.3 352 96 337.7 96 320zM544 480C544 497.7 529.7 512 512 512L128 512C110.3 512 96 497.7 96 480C96 462.3 110.3 448 128 448L512 448C529.7 448 544 462.3 544 480z"/>
+                </svg>
+            </button>
+
+
+            <button class="toggle" id="toggleSidebarclose" aria-label="Fechar menu">
+                <svg class="icon" viewBox="0 0 640 640" aria-hidden="true">
+                    <path d="M504.6 148.5C515.9 134.9 514.1 114.7 500.5 103.4C486.9 92.1 466.7 93.9 455.4 107.5L320 270L184.6 107.5C173.3 93.9 153.1 92.1 139.5 103.4C125.9 114.7 124.1 134.9 135.4 148.5L278.3 320L135.4 491.5C124.1 505.1 125.9 525.3 139.5 536.6C153.1 547.9 173.3 546.1 184.6 532.5L320 370L455.4 532.5C466.7 546.1 486.9 547.9 500.5 536.6C514.1 525.3 515.9 505.1 504.6 491.5L361.7 320L504.6 148.5z"/>
+                </svg>
+            </button>
+
+        </div>
+
+
+        <nav class="menu">
+            <button class="menu-item active" data-view="raci"> <!-- active para ativar a tela -->
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                    <path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z"/>
+                </svg>
+                <span class="label">Matriz RACIS</span>
+            </button>
+
+            <button class="menu-item" data-view="gantt"> <!-- active para ativar a tela -->
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                    <path d="M216 64C229.3 64 240 74.7 240 88L240 128L400 128L400 88C400 74.7 410.7 64 424 64C437.3 64 448 74.7 448 88L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 88C192 74.7 202.7 64 216 64zM480 496C488.8 496 496 488.8 496 480L496 416L408 416L408 496L480 496zM496 368L496 288L408 288L408 368L496 368zM360 368L360 288L280 288L280 368L360 368zM232 368L232 288L144 288L144 368L232 368zM144 416L144 480C144 488.8 151.2 496 160 496L232 496L232 416L144 416zM280 416L280 496L360 496L360 416L280 416zM216 176L160 176C151.2 176 144 183.2 144 192L144 240L496 240L496 192C496 183.2 488.8 176 480 176L216 176z"/>
+                </svg>
+                <span class="label">Cronograma</span>
+            </button>
+        </nav>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="content">
+
+        <!-- VIEW RACI -->
+        <section class="view active" id="view-raci"> <!-- active para ativar a tela -->
+
+            <!-- HEADER -->
+            <header class="raci-header">
+                <div class="container-name-matriz"> <!-- "editing" para editar o item -->
+                    <span class="name-matriz truncate">Matriz Padrão</span>
+                    <input type="text" class="edit-matrizname" placeholder="Digite o nome da sua matriz"/>
+                </div>
+
+                <div class="raci-header-actions">
+                    
+                    <button class="btn-raci primary">Nova Matriz</button>
+
+                    <!-- AÇÕES DO SETOR / MATRIZ -->
+                    <button class="btn-sector-actions" aria-label="Ações da matriz" title="Ações da matriz">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                            <path d="M320 208C289.1 208 264 182.9 264 152C264 121.1 289.1 96 320 96C350.9 96 376 121.1 376 152C376 182.9 350.9 208 320 208zM320 432C350.9 432 376 457.1 376 488C376 518.9 350.9 544 320 544C289.1 544 264 518.9 264 488C264 457.1 289.1 432 320 432zM376 320C376 350.9 350.9 376 320 376C289.1 376 264 350.9 264 320C264 289.1 289.1 264 320 264C350.9 264 376 289.1 376 320z"/>
+                        </svg>
+                    </button>
+
+                    <!-- MENU FLUTUANTE -->
+                    <div class="menu-matriz hidden" data-has-cronograma="false"> <!-- "hidden" para que o menu suma -->
+
+                        <button class="menu-item-matriz" data-action="rename" data-target="matriz">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M416.9 85.2L372 130.1L509.9 268L554.8 223.1C568.4 209.6 576 191.2 576 172C576 152.8 568.4 134.4 554.8 120.9L519.1 85.2C505.6 71.6 487.2 64 468 64C448.8 64 430.4 71.6 416.9 85.2zM338.1 164L122.9 379.1C112.2 389.8 104.4 403.2 100.3 417.8L64.9 545.6C62.6 553.9 64.9 562.9 71.1 569C77.3 575.1 86.2 577.5 94.5 575.2L222.3 539.7C236.9 535.6 250.2 527.9 261 517.1L476 301.9L338.1 164z"/>
+                            </svg>
+                            Renomear
+                        </button>
+
+
+                        <button class="menu-item-matriz" data-action="duplicate">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M288 64C252.7 64 224 92.7 224 128L224 384C224 419.3 252.7 448 288 448L480 448C515.3 448 544 419.3 544 384L544 183.4C544 166 536.9 149.3 524.3 137.2L466.6 81.8C454.7 70.4 438.8 64 422.3 64L288 64zM160 192C124.7 192 96 220.7 96 256L96 512C96 547.3 124.7 576 160 576L352 576C387.3 576 416 547.3 416 512L416 496L352 496L352 512L160 512L160 256L176 256L176 192L160 192z"/>
+                            </svg>
+                            Duplicar
+                        </button>
+
+                        <button class="menu-item-matriz" data-action="importar">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M192 64C156.7 64 128 92.7 128 128L128 368L310.1 368L279.1 337C269.7 327.6 269.7 312.4 279.1 303.1C288.5 293.8 303.7 293.7 313 303.1L385 375.1C394.4 384.5 394.4 399.7 385 409L313 481C303.6 490.4 288.4 490.4 279.1 481C269.8 471.6 269.7 456.4 279.1 447.1L310.1 416.1L128 416.1L128 512.1C128 547.4 156.7 576.1 192 576.1L448 576.1C483.3 576.1 512 547.4 512 512.1L512 234.6C512 217.6 505.3 201.3 493.3 189.3L386.7 82.7C374.7 70.7 358.5 64 341.5 64L192 64zM453.5 240L360 240C346.7 240 336 229.3 336 216L336 122.5L453.5 240z"/>
+                            </svg>
+                            Importar
+                        </button>
+
+                        <button class="menu-item-matriz" data-action="export">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M128.5 64C93.2 64 64.5 92.7 64.5 128L64.5 512C64.5 547.3 93.2 576 128.5 576L384.5 576C419.8 576 448.5 547.3 448.5 512L448.5 416L526.6 416L495.6 447C486.2 456.4 486.2 471.6 495.6 480.9C505 490.2 520.2 490.3 529.5 480.9L601.5 408.9C610.9 399.5 610.9 384.3 601.5 375L529.5 303C520.1 293.6 504.9 293.6 495.6 303C486.3 312.4 486.2 327.6 495.6 336.9L526.6 367.9L448.5 367.9L448.5 234.4C448.5 217.4 441.8 201.1 429.8 189.1L323.2 82.7C311.2 70.7 295 64 278 64L128.5 64zM390 240L296.5 240C283.2 240 272.5 229.3 272.5 216L272.5 122.5L390 240zM256.5 392C256.5 378.7 267.2 368 280.5 368L384.5 368L384.5 416L280.5 416C267.2 416 256.5 405.3 256.5 392z"/>
+                            </svg>
+                            Exportar
+                        </button>
+
+                        <div class="menu-divider"></div>
+
+                        <button class="menu-item-matriz" data-action="gerar-excel">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M352 224L352 320L480 320L480 224L352 224zM288 224L160 224L160 320L288 320L288 224zM96 384L96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 384zM480 384L352 384L352 480L480 480L480 384zM288 480L288 384L160 384L160 480L288 480z"/>
+                            </svg>
+                            Gerar Excel
+                        </button>
+                
+                        <!-- ESTADO: cronograma JÁ existe -->
+                        <button class="menu-item-matriz not-close" data-action="open-cronograma">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M224 64C241.7 64 256 78.3 256 96L256 128L384 128L384 96C384 78.3 398.3 64 416 64C433.7 64 448 78.3 448 96L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 96C192 78.3 206.3 64 224 64zM160 304L160 336C160 344.8 167.2 352 176 352L208 352C216.8 352 224 344.8 224 336L224 304C224 295.2 216.8 288 208 288L176 288C167.2 288 160 295.2 160 304zM288 304L288 336C288 344.8 295.2 352 304 352L336 352C344.8 352 352 344.8 352 336L352 304C352 295.2 344.8 288 336 288L304 288C295.2 288 288 295.2 288 304zM432 288C423.2 288 416 295.2 416 304L416 336C416 344.8 423.2 352 432 352L464 352C472.8 352 480 344.8 480 336L480 304C480 295.2 472.8 288 464 288L432 288zM160 432L160 464C160 472.8 167.2 480 176 480L208 480C216.8 480 224 472.8 224 464L224 432C224 423.2 216.8 416 208 416L176 416C167.2 416 160 423.2 160 432zM304 416C295.2 416 288 423.2 288 432L288 464C288 472.8 295.2 480 304 480L336 480C344.8 480 352 472.8 352 464L352 432C352 423.2 344.8 416 336 416L304 416zM416 432L416 464C416 472.8 423.2 480 432 480L464 480C472.8 480 480 472.8 480 464L480 432C480 423.2 472.8 416 464 416L432 416C423.2 416 416 423.2 416 432z"/>
+                            </svg> 
+                            Abrir Cronograma
+                        </button>
+
+                        <div class="menu-divider"></div>
+
+                        <button class="menu-item-matriz danger not-close" data-action="delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
+                            </svg> 
+                            Excluir Matriz
+                        </button>
+
+                    </div>
+
+                </div>
+            </header>
+
+
+            <!-- LAYOUT -->
+            <section class="raci-layout"> 
+                <!-- LEGENDA -->
+                <aside class="raci-legend-container">
+                    <div class="raci-legend">
+                        <h2>Legenda</h2>
+                        <p>
+                        Adicione tarefas ou projetos e identifique os membros da equipe usando a matriz RACIS.
+                        </p>
+                    </div>
+
+                    <ul class="legend-list">
+                        <li class="legend-item">
+                            <span class="raci-circle r">R</span>
+                            <span><strong>Responsável</strong> — Responsável por executar a tarefa.</span>
+                        </li>
+                        <li class="legend-item">
+                            <span class="raci-circle a">A</span>
+                            <span><strong>Aprovador</strong> — Valida a entrega.</span>
+                        </li>
+                        <li class="legend-item">
+                            <span class="raci-circle c">C</span>
+                            <span><strong>Consultado</strong> — Fornece apoio teorico a quem executa tarefa.</span>
+                        </li>
+                        <li class="legend-item">
+                            <span class="raci-circle i">I</span>
+                            <span><strong>Informado</strong> — Acompanha o progresso.</span>
+                        </li>
+                        <li class="legend-item">
+                            <span class="raci-circle s">S</span>
+                            <span><strong>Suporte</strong> — Apoia diretamente quem executa a tarefa.</span>
+                        </li>
+                    </ul>
+                </aside>
+
+                <!-- MATRIZ -->
+                <section class="raci-matrix"> 
+                    
+                    <div class="raci-toolbar">
+                        
+                        <!-- SELETOR DE MATRIZ -->
+                        <div class="context-selector-raci">
+                            <label for="matrixSelect-raci">Matriz:</label>
+                            <select id="matrixSelect-raci">
+                                <!-- <option value="m1">Matriz Padrão</option> -->
+                            </select>
+                        </div>
+                        
+
+                        <div class="raci-actions">
+                            <button class="btn-add">Adicionar Membro</button>
+                            <button class="btn-add">Adicionar Tarefa</button>
+                        </div>
+
+                    </div>
+
+                    <div class="raci-board">
+                        
+                        <table class="tabela-raci raci-table">
+                            <thead class="raci-thead">
+                                <tr>
+
+                                    <!-- <th scope="col" class="task-column sticky-col">Tarefas</th> -->
+
+                                    <!-- <th scope="col" class="member">
+                                        <div class="member-name-wrapper"> "editing" para editar o item 
+                                            <span class="member-name truncate">Membro Padrão</span>
+                                            <input class="input-member" type="text" placeholder="Digite o nome do membro">
+                                        </div>
+                                        <button class="remove-member not-close" type="button"> "not-close" o item não pode ser excluido  
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </th> -->
+
+                                </tr>
+                            </thead>
+
+                            <tbody class="raci-tbody">
+
+                                <!-- <tr class="tarefa_item">
+                                    <th scope="row" class="container_nametask">
+                                        <div class="task-text"> "editing" para editar o item 
+                                            <span class="tarefa-name truncate">Tarefa Padrão</span>
+                                            <input class="input-task" type="text" placeholder="Digite a tarefa">
+                                        </div>
+                                    </th>
+
+                                    <td class="raci-cell" data-raci="none">
+                                        <div class="col-raci">
+                                            <span class="circulo none-cir">-</span>
+                                        </div>
+                                    </td>
+
+                                    <td class="actions-cell"> 
+                                        <button class="btn_closetask not-close" type="button"> "not-close" o item não pode ser excluido 
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                                <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
+                                            </svg>
+                                        </button>
+                                    </td>
+                                </tr> -->
+
+                            </tbody>
+                        </table>
+                        
+                        <div id="menu-raci" class="menu-raci hidden" role="menu">
+                            <button class="btn-circulo r-cir" data-valor="R" aria-label="Responsável">R</button>
+                            <button class="btn-circulo a-cir" data-valor="A" aria-label="Aprovador">A</button>
+                            <button class="btn-circulo c-cir" data-valor="C" aria-label="Consultado">C</button>
+                            <button class="btn-circulo i-cir" data-valor="I" aria-label="Informado">I</button>
+                            <button class="btn-circulo s-cir" data-valor="S" aria-label="Suporte">S</button>
+                            <button class="btn-circulo none-cir" data-valor="-" aria-label="Nenhum">-</button>
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </section>
+
+        </section>
+
+
+        <!-- VIEW GANTT -->
+        <section class="view" id="view-gantt"> <!-- active para ativar a tela -->
+
+            <!-- HEADER DO CRONOGRAMA / CONTEXTO -->
+            <header class="context-header">
+                
+                <!-- SELETOR DE CRONOGRAMA -->
+                <div class="context-selector-gantt">
+                    <label for="ganttSelect">Cronograma:</label>
+                    <select id="ganttSelect">
+                        <!-- <option value="g1">Cronograma Padrão</option> -->
+                    </select>
+                </div>
+
+
+                <div class="container_name"> <!-- "editing" para editar o item -->
+                    <span class="name-cronograma truncate" title="Cronograma do Projeto">
+                        Cronograma Padrão
+                    </span>
+                    <input type="text" class="context-title" placeholder="Digite o nome do seu cronograma"/>
+                </div>
+
+                <!-- AÇÕES -->
+                <div class="header-actions">
+                    <button class="btn-gantt primary">Cria Cronograma</button>
+                    <button class="btn-gantt new-task">Nova Tarefa</button>
+
+                    <!-- AÇÕES DO SETOR / MATRIZ -->
+                    <div class="cronograma-actions">
+                        <button class="btn-sector-actions" title="Ações da matriz">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                <path d="M320 208C289.1 208 264 182.9 264 152C264 121.1 289.1 96 320 96C350.9 96 376 121.1 376 152C376 182.9 350.9 208 320 208zM320 432C350.9 432 376 457.1 376 488C376 518.9 350.9 544 320 544C289.1 544 264 518.9 264 488C264 457.1 289.1 432 320 432zM376 320C376 350.9 350.9 376 320 376C289.1 376 264 350.9 264 320C264 289.1 289.1 264 320 264C350.9 264 376 289.1 376 320z"/>
+                            </svg>
+                        </button>
+
+                        <!-- MENU FLUTUANTE DO CRONOGRAMA -->
+                        <div class="menu-cronograma hidden" data-linked-matriz="false">
+                            <button class="menu-item-cronograma" data-action="rename" data-target="cronograma">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M416.9 85.2L372 130.1L509.9 268L554.8 223.1C568.4 209.6 576 191.2 576 172C576 152.8 568.4 134.4 554.8 120.9L519.1 85.2C505.6 71.6 487.2 64 468 64C448.8 64 430.4 71.6 416.9 85.2zM338.1 164L122.9 379.1C112.2 389.8 104.4 403.2 100.3 417.8L64.9 545.6C62.6 553.9 64.9 562.9 71.1 569C77.3 575.1 86.2 577.5 94.5 575.2L222.3 539.7C236.9 535.6 250.2 527.9 261 517.1L476 301.9L338.1 164z"/>
+                                </svg>
+                                Renomear
+                            </button>
+
+                            <button class="menu-item-cronograma" data-action="duplicate">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M288 64C252.7 64 224 92.7 224 128L224 384C224 419.3 252.7 448 288 448L480 448C515.3 448 544 419.3 544 384L544 183.4C544 166 536.9 149.3 524.3 137.2L466.6 81.8C454.7 70.4 438.8 64 422.3 64L288 64zM160 192C124.7 192 96 220.7 96 256L96 512C96 547.3 124.7 576 160 576L352 576C387.3 576 416 547.3 416 512L416 496L352 496L352 512L160 512L160 256L176 256L176 192L160 192z"/>
+                                </svg>
+                                Duplicar Cronograma
+                            </button>
+
+                            <button class="menu-item-cronograma" data-action="importar">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M192 64C156.7 64 128 92.7 128 128L128 368L310.1 368L279.1 337C269.7 327.6 269.7 312.4 279.1 303.1C288.5 293.8 303.7 293.7 313 303.1L385 375.1C394.4 384.5 394.4 399.7 385 409L313 481C303.6 490.4 288.4 490.4 279.1 481C269.8 471.6 269.7 456.4 279.1 447.1L310.1 416.1L128 416.1L128 512.1C128 547.4 156.7 576.1 192 576.1L448 576.1C483.3 576.1 512 547.4 512 512.1L512 234.6C512 217.6 505.3 201.3 493.3 189.3L386.7 82.7C374.7 70.7 358.5 64 341.5 64L192 64zM453.5 240L360 240C346.7 240 336 229.3 336 216L336 122.5L453.5 240z"/>
+                                </svg>
+                                Importar
+                            </button>
+
+                            <button class="menu-item-cronograma" data-action="export">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M128.5 64C93.2 64 64.5 92.7 64.5 128L64.5 512C64.5 547.3 93.2 576 128.5 576L384.5 576C419.8 576 448.5 547.3 448.5 512L448.5 416L526.6 416L495.6 447C486.2 456.4 486.2 471.6 495.6 480.9C505 490.2 520.2 490.3 529.5 480.9L601.5 408.9C610.9 399.5 610.9 384.3 601.5 375L529.5 303C520.1 293.6 504.9 293.6 495.6 303C486.3 312.4 486.2 327.6 495.6 336.9L526.6 367.9L448.5 367.9L448.5 234.4C448.5 217.4 441.8 201.1 429.8 189.1L323.2 82.7C311.2 70.7 295 64 278 64L128.5 64zM390 240L296.5 240C283.2 240 272.5 229.3 272.5 216L272.5 122.5L390 240zM256.5 392C256.5 378.7 267.2 368 280.5 368L384.5 368L384.5 416L280.5 416C267.2 416 256.5 405.3 256.5 392z"/>
+                                </svg>
+                                Exportar
+                            </button>
+
+                            <div class="menu-divider"></div>
+
+                            <button class="menu-item-cronograma" data-action="gerar-excel">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M352 224L352 320L480 320L480 224L352 224zM288 224L160 224L160 320L288 320L288 224zM96 384L96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 384zM480 384L352 384L352 480L480 480L480 384zM288 480L288 384L160 384L160 480L288 480z"/>
+                                </svg>
+                                Gerar Excel
+                            </button>
+
+                            <!-- ESTADO: cronograma NÃO vinculado -->
+                            <button class="menu-item-cronograma" data-action="link-matriz">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M451.5 160C434.9 160 418.8 164.5 404.7 172.7C388.9 156.7 370.5 143.3 350.2 133.2C378.4 109.2 414.3 96 451.5 96C537.9 96 608 166 608 252.5C608 294 591.5 333.8 562.2 363.1L491.1 434.2C461.8 463.5 422 480 380.5 480C294.1 480 224 410 224 323.5C224 322 224 320.5 224.1 319C224.6 301.3 239.3 287.4 257 287.9C274.7 288.4 288.6 303.1 288.1 320.8C288.1 321.7 288.1 322.6 288.1 323.4C288.1 374.5 329.5 415.9 380.6 415.9C405.1 415.9 428.6 406.2 446 388.8L517.1 317.7C534.4 300.4 544.2 276.8 544.2 252.3C544.2 201.2 502.8 159.8 451.7 159.8zM307.2 237.3C305.3 236.5 303.4 235.4 301.7 234.2C289.1 227.7 274.7 224 259.6 224C235.1 224 211.6 233.7 194.2 251.1L123.1 322.2C105.8 339.5 96 363.1 96 387.6C96 438.7 137.4 480.1 188.5 480.1C205 480.1 221.1 475.7 235.2 467.5C251 483.5 269.4 496.9 289.8 507C261.6 530.9 225.8 544.2 188.5 544.2C102.1 544.2 32 474.2 32 387.7C32 346.2 48.5 306.4 77.8 277.1L148.9 206C178.2 176.7 218 160.2 259.5 160.2C346.1 160.2 416 230.8 416 317.1C416 318.4 416 319.7 416 321C415.6 338.7 400.9 352.6 383.2 352.2C365.5 351.8 351.6 337.1 352 319.4C352 318.6 352 317.9 352 317.1C352 283.4 334 253.8 307.2 237.5z"/>
+                                </svg>
+                                Vincular Matriz
+                            </button>
+
+                            <!-- ESTADO: cronograma JÁ vinculado -->
+                            <button class="menu-item-cronograma" data-action="unlink-matriz" style="display:none;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M73 39.1C63.6 29.7 48.4 29.7 39.1 39.1C29.8 48.5 29.7 63.7 39 73.1L567 601.1C576.4 610.5 591.6 610.5 600.9 601.1C610.2 591.7 610.3 576.5 600.9 567.2L478.9 445.2C483.1 441.8 487.2 438.1 491 434.3L562.1 363.2C591.4 333.9 607.9 294.1 607.9 252.6C607.9 166.2 537.9 96.1 451.4 96.1C414.1 96.1 378.3 109.4 350.1 133.3C370.4 143.4 388.8 156.8 404.6 172.8C418.7 164.5 434.8 160.1 451.4 160.1C502.5 160.1 543.9 201.5 543.9 252.6C543.9 277.1 534.2 300.6 516.8 318L445.7 389.1C441.8 393 437.6 396.5 433.1 399.6L385.6 352.1C402.1 351.2 415.3 337.7 415.8 321C415.8 319.7 415.8 318.4 415.8 317.1C415.8 230.8 345.9 160.2 259.3 160.2C240.1 160.2 221.4 163.7 203.8 170.4L73 39.1zM257.9 224C258.5 224 259 224 259.6 224C274.7 224 289.1 227.7 301.7 234.2C303.5 235.4 305.3 236.5 307.2 237.3C334 253.6 352 283.2 352 316.9C352 317.3 352 317.7 352 318.1L257.9 224zM378.2 480L224 325.8C225.2 410.4 293.6 478.7 378.1 479.9zM171.7 273.5L126.4 228.2L77.8 276.8C48.5 306.1 32 345.9 32 387.4C32 473.8 102 543.9 188.5 543.9C225.7 543.9 261.6 530.6 289.8 506.7C269.5 496.6 251 483.2 235.2 467.2C221.2 475.4 205.1 479.8 188.5 479.8C137.4 479.8 96 438.4 96 387.3C96 362.8 105.7 339.3 123.1 321.9L171.7 273.3z"/>
+                                </svg>
+                                Desvincular Matriz
+                            </button>
+
+                            <div class="menu-divider"></div>
+
+                            <button class="menu-item-cronograma danger not-close" data-action="delete">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                                    <path d="M232.7 69.9L224 96L128 96C110.3 96 96 110.3 96 128C96 145.7 110.3 160 128 160L512 160C529.7 160 544 145.7 544 128C544 110.3 529.7 96 512 96L416 96L407.3 69.9C402.9 56.8 390.7 48 376.9 48L263.1 48C249.3 48 237.1 56.8 232.7 69.9zM512 208L128 208L149.1 531.1C150.7 556.4 171.7 576 197 576L443 576C468.3 576 489.3 556.4 490.9 531.1L512 208z"/>
+                                </svg>
+                                Excluir Cronograma
+                            </button>
+                        </div>
+                    </div>
+                    
+
+                </div>
+
+            </header>
+
+            <!-- CONTEÚDO DO GANTT -->
+            <section class="gantt-layout">
+
+                <!-- CRONOGRAMA -->
+                <section class="schedule-left">
+
+                    <header class="schedule-header">
+                        <div class="schedule_header_title_task">Tarefa</div>
+                        <div class="schedule-header_title_inicio">Início</div>
+                        <div class="schedule-header_title_fim">Fim</div>
+                        <div class="schedule-header_title_status">Status</div>
+                    </header>
+
+                    <div class="schedule-body">
+
+                        <!-- <div class="schedule-row">
+                            <div class="task-name"> "editing" para editar o item 
+                                <span class="task-text truncate">Nova Tarefa</span>
+                                <input type="text">
+                            </div>
+                        
+                            <div class="task-date"> "editing" para editar o item 
+                                <span class="date-text">00/00</span>
+                                <input type="text" placeholder="__/__"> 
+                            </div>
+
+                            <div class="task-date"> "editing" para editar o item 
+                                <span class="date-text">00/00</span>
+                                <input type="text" placeholder="__/__"> 
+                            </div>
+                        
+                            <div class="container_status"> 
+                                <span class="status-select pending">Pendente</span>
+                            </div>
+
+                            <button class="remove-task" type="button">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button> 
+                        </div> -->
+
+                    </div>
+
+                    <!-- MENU FLUTUANTE (único) -->
+                    <div class="menu-task-status hidden">
+                        <span class="status-select pending" data-status="pending">Pendente</span>
+                        <span class="status-select progress" data-status="progress">Progresso</span>
+                        <span class="status-select done" data-status="done">Concluída</span>
+                    </div>
+
+                </section>
+
+
+                <!-- GANTT EM TESTE -->
+                <section class="gantt-right">
+                    <!-- VIEWPORT COM SCROLL TOTAL -->
+                    <div class="gantt-viewport">
+
+                        <!-- HEADER DOS MESES -->
+                        <header class="gantt-header">
+                            <div class="month">JAN</div>
+                            <div class="month">FEV</div>
+                            <div class="month">MAR</div>
+                            <div class="month">ABR</div>
+                            <div class="month">MAI</div>
+                            <div class="month">JUN</div>
+                            <div class="month">JUL</div>
+                            <div class="month">AGO</div>
+                            <div class="month">SET</div>
+                            <div class="month">OUT</div>
+                            <div class="month">NOV</div>
+                            <div class="month">DEZ</div>
+                        </header>
+
+                        <!-- GRID (LINHAS + BARRAS) -->
+                        <div class="gantt-grid"> 
+
+                            <!-- <div class="gantt-row">
+                                <div class="gantt-bar done" style="left: 8%; width: 22%;"></div>
+                            </div> -->
+                            
+                        </div>
+
+                    </div>
+                </section>
+
+            </section>
+
+        </section>
+
+        <!-- SHOW TEXT -->
+        <div id="show_text" class="show-text hidden" role="tooltip">Show Text</div>
+    
+    </main>
+
+    <!-- POPUPS GLOBAIS -->
+    <div id="popup-root" aria-live="polite">
+
+        <div class="popup-overlay"></div>
+
+        <div class="popup">
+            <h3 class="popup-title"></h3>
+
+            <p class="popup-message">
+                
+            </p>
+
+            <div class="popup-actions">
+                <button class="btn-popup neutral"></button>
+                <button class="btn-popup danger"></button>
+                <button class="btn-popup success"></button>
+            </div>
+        </div> 
+
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast"> <!-- Barra de notificações --> </div>
+
+    <!-- BIBLIOTECA -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="core_all.js"></script>
+    <script src="../gantt/gantt_code.js"></script>
+    <script src="../racis/raci_code.js"></script>
+
+</body>
+</html>
