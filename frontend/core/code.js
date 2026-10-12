@@ -7,6 +7,100 @@ const supabaseClient = window.supabaseClient;
 
 let toastTimer;
 
+const seletorMatriz = document.getElementById("matrixSelect-raci");
+const tituloMatriz = document.querySelector(
+    ".raci-panel .matrix-title-row h2"
+);
+
+// Envia requisições para a API usando a sessão atual do Supabase.
+async function requisicaoApi(caminho, opcoes = {}) {
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (error) {
+        throw error;
+    }
+
+    const token = data.session?.access_token;
+
+    if (!token) {
+        throw new Error("Sua sessão expirou. Entre novamente.");
+    }
+
+    const resposta = await fetch(
+        `${window.NEXUS_CONFIG.API_BASE_URL}${caminho}`,
+        {
+            ...opcoes,
+            headers: {
+                ...(opcoes.body
+                    ? { "Content-Type": "application/json" }
+                    : {}),
+                ...opcoes.headers,
+                Authorization: `Bearer ${token}`
+            }
+        }
+    );
+
+    let resultado = null;
+
+    if (resposta.status !== 204) {
+        try {
+            resultado = await resposta.json();
+        } catch {
+            resultado = null;
+        }
+    }
+
+    if (!resposta.ok) {
+        throw new Error(
+            resultado?.detail || `Erro HTTP ${resposta.status}`
+        );
+    }
+
+    return resultado;
+}
+
+// Busca as matrizes que pertencem ao usuário autenticado.
+async function carregarMatrizes(idSelecionado = null) {
+    const matrizes = await requisicaoApi("/matrizes/");
+
+    seletorMatriz.replaceChildren();
+
+    if (matrizes.length === 0) {
+        const opcao = document.createElement("option");
+        opcao.value = "";
+        opcao.textContent = "Nenhuma matriz criada";
+
+        seletorMatriz.appendChild(opcao);
+        tituloMatriz.textContent = "Nenhuma matriz criada";
+        return;
+    }
+
+    matrizes.forEach(matriz => {
+        const opcao = document.createElement("option");
+
+        opcao.value = matriz.id;
+        opcao.textContent = matriz.nome;
+
+        seletorMatriz.appendChild(opcao);
+    });
+
+    const selecionada =
+        matrizes.find(matriz => matriz.id === idSelecionado) ||
+        matrizes[0];
+
+    seletorMatriz.value = selecionada.id;
+    tituloMatriz.textContent = selecionada.nome;
+}
+
+// Atualiza o título quando o usuário seleciona outra matriz.
+seletorMatriz.addEventListener("change", () => {
+    const opcao = seletorMatriz.selectedOptions[0];
+
+    if (opcao && opcao.value) {
+        tituloMatriz.textContent = opcao.textContent;
+    }
+});
+
 // MOSTRAR NOTIFICAÇÕES
 function showToast(message) {
     toast.textContent = message;
@@ -77,6 +171,13 @@ async function verificarSessao() {
         // Com sessão ativa, apresenta os dados do usuário.
         preencherPerfil(data.session.user);
 
+        try {
+            await carregarMatrizes();
+        } catch (error) {
+            console.error("Erro ao carregar matrizes:", error);
+            showToast(`Não foi possível carregar as matrizes: ${error.message}`);
+        }
+
     } catch (error) {
         console.error("Erro ao verificar a sessão:", error);
 
@@ -124,40 +225,62 @@ document.querySelectorAll("[data-view]").forEach(button => {
 
 // AÇÕES DEMONSTRATIVAS E ENCERRAMENTO DE SESSÃO
 document.querySelectorAll("[data-demo-action]").forEach(button => {
-    if (button.dataset.demoAction === "sair") {
-        // O botão Sair agora encerra a sessão real.
+    const acao = button.dataset.demoAction;
+
+    if (acao === "sair") {
         button.addEventListener("click", async () => {
             button.disabled = true;
 
             try {
-                const { error } =
-                    await supabaseClient.auth.signOut();
-
-                if (error) {
-                    throw error;
-                }
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
 
                 window.location.replace("../auth/auth_index.html");
-
             } catch (error) {
                 console.error("Erro ao sair da conta:", error);
-
-                showToast(
-                    "Não foi possível sair da conta. Tente novamente."
-                );
-
+                showToast("Não foi possível sair da conta. Tente novamente.");
                 button.disabled = false;
             }
         });
+        return;
+    } 
 
+    if (acao === "nova-matriz") {
+        button.addEventListener("click", async () => {
+            const nome = prompt("Qual será o nome da nova matriz?");
+
+            if (nome === null) return;
+
+            if (!nome.trim()) {
+                showToast("Informe um nome para a matriz.");
+                return;
+            }
+
+            button.disabled = true;
+
+            try {
+                const novaMatriz = await requisicaoApi("/matrizes/", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        nome: nome.trim()
+                    })
+                });
+
+                await carregarMatrizes(novaMatriz.id);
+                showToast("Matriz criada com sucesso!");
+            } catch (error) {
+                console.error("Erro ao criar matriz:", error);
+                showToast(`Não foi possível criar a matriz: ${error.message}`);
+            } finally {
+                button.disabled = false;
+            }
+        });
         return;
     }
 
-    // As demais ações continuam como demonstrações.
+    // Demais ações demonstrativas
     button.addEventListener("click", () => {
-        showToast(
-            "Esta ação será conectada ao backend nas próximas etapas."
-        );
+        showToast("Esta ação será conectada ao backend nas próximas etapas.");
     });
 });
 
