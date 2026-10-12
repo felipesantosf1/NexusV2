@@ -6,8 +6,7 @@
 
     <!-- ICONS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- ICONS -->
-
+    
     <!-- FONT -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -27,11 +26,15 @@
             <button class="auth-tab" id="tabRegisterBtn" onclick="switchTab('register')">Cadastrar</button>
         </div>
 
-        <!-- LOGIN: Senha -->
+        <!-- LOGIN -->
         <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-alert" id="loginAlert" style="display: none;">
+                <i class="fa-solid" id="loginAlertIcon"></i>
+                <span id="loginAlertText"></span>
+            </div>
+
             <div class="form-group">
                 <label class="form-label" for="loginEmail">E-mail</label>
-
                 <input class="form-input" type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="email" required>
             </div>
 
@@ -44,7 +47,7 @@
                     </button>
                 </div>
             </div>
-            <!-- LINK DE ESQUECEU A SENHA -->
+            
             <div class="auth-forgot-container">
                 <a href="#" class="auth-forgot-link" onclick="openForgotPassword(event)">Esqueceu a senha?</a>
             </div>
@@ -52,8 +55,13 @@
             <p class="auth-footer-text">Não tem uma conta? <a onclick="switchTab('register')">Cadastre-se</a></p>
         </form>
 
-        <!-- CADASTRO: Senhas -->
+        <!-- CADASTRO -->
         <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+            <div class="form-alert" id="registerAlert" style="display: none;">
+                <i class="fa-solid" id="registerAlertIcon"></i>
+                <span id="registerAlertText"></span>
+            </div>
+
             <div class="form-group">
                 <label class="form-label" for="regUser">Usuário</label>
                 <input class="form-input" type="text" id="regUser" placeholder="Seu nome de usuário" required>
@@ -85,62 +93,24 @@
         </form>
 
         <!-- REDEFINIÇÃO DE SENHA -->
-        <form
-            class="auth-form"
-            id="resetForm"
-            onsubmit="handleUpdatePassword(event)"
-        >
-            <div class="form-group">
-                <label class="form-label" for="newPassword">
-                    Nova senha
-                </label>
-
-                <input
-                    class="form-input"
-                    type="password"
-                    id="newPassword"
-                    minlength="8"
-                    autocomplete="new-password"
-                    required
-                >
+        <form class="auth-form" id="resetForm" onsubmit="handleUpdatePassword(event)">
+            <div class="form-alert" id="resetAlert" style="display: none;">
+                <i class="fa-solid" id="resetAlertIcon"></i>
+                <span id="resetAlertText"></span>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="confirmNewPassword">
-                    Confirmar nova senha
-                </label>
-
-                <input
-                    class="form-input"
-                    type="password"
-                    id="confirmNewPassword"
-                    minlength="8"
-                    autocomplete="new-password"
-                    required
-                >
+                <label class="form-label" for="newPassword">Nova senha</label>
+                <input class="form-input" type="password" id="newPassword" minlength="8" autocomplete="new-password" required>
             </div>
 
-            <button type="submit" class="btn-submit">
-                Atualizar senha
-            </button>
+            <div class="form-group">
+                <label class="form-label" for="confirmNewPassword">Confirmar nova senha</label>
+                <input class="form-input" type="password" id="confirmNewPassword" minlength="8" autocomplete="new-password" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Atualizar senha</button>
         </form>
-    </div>
-
-    <div id="toast">
-        <span class="toast-icon" id="toastIcon"><i class="fa-solid fa-circle-info"></i></span>
-        <span class="toast-message" id="toastMessage">Mensagem do sistema</span>
-        <button class="toast-close" onclick="hideToast()">✕</button>
-    </div>
-
-    <div id="popup-root">
-        <div class="popup-overlay" onclick="closePopup()"></div>
-        <div class="popup">
-            <h3 class="popup-title" id="popupTitle">Aviso</h3>
-            <p class="popup-message" id="popupMessage">Mensagem detalhada aqui.</p>
-            <div class="popup-actions" id="popupActions">
-                <button class="btn-popup neutral" onclick="closePopup()">Fechar</button>
-            </div>
-        </div>
     </div>
 
     <!-- BIBLIOTECA -->

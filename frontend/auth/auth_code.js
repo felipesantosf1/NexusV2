@@ -1,8 +1,6 @@
-
-let toastTimeout = null;
-
 const supabaseClient = window.supabaseClient;
 
+let alertaTimeouts = {};
 
 // MOSTRAR OU OCULTAR SENHA
 function togglePassword(button) {
@@ -11,11 +9,9 @@ function togglePassword(button) {
     const icon = button.querySelector("i");
 
     input.type = input.type === "password" ? "text" : "password";
-
     icon.classList.toggle("fa-eye");
     icon.classList.toggle("fa-eye-slash");
 }
-
 
 // ALTERNAR ENTRE LOGIN, CADASTRO E REDEFINIÇÃO
 function switchTab(tab) {
@@ -27,17 +23,13 @@ function switchTab(tab) {
 
     Object.entries(forms).forEach(([nome, form]) => {
         form.classList.toggle("active", nome === tab);
+        limparAlerta(nome); // Limpa mensagens ao trocar de aba
     });
 
     document.getElementById("authTabs").hidden = tab === "reset";
 
-    document.getElementById("tabLoginBtn").classList.toggle(
-        "active", tab === "login"
-    );
-
-    document.getElementById("tabRegisterBtn").classList.toggle(
-        "active", tab === "register"
-    );
+    document.getElementById("tabLoginBtn").classList.toggle("active", tab === "login");
+    document.getElementById("tabRegisterBtn").classList.toggle("active", tab === "register");
 
     const textos = {
         login: ["Acessar Nexus", "Entre com seu e-mail e senha."],
@@ -49,62 +41,68 @@ function switchTab(tab) {
     document.getElementById("authSubtitle").textContent = textos[tab][1];
 }
 
+// GERENCIAMENTO DE ALERTAS EMBUTIDOS (Substitui o Toast/Popup)
+function mostrarAlerta(formId, mensagem, tipo = "error", duracao = 0) {
+    const alertBox = document.getElementById(`${formId}Alert`);
+    const alertText = document.getElementById(`${formId}AlertText`);
+    const alertIcon = document.getElementById(`${formId}AlertIcon`);
 
-// NOTIFICAÇÕES
-function showToast(message, type = "info") {
-    const toast = document.getElementById("toast");
+    if (!alertBox || !alertText || !alertIcon) return;
 
-    document.getElementById("toastMessage").textContent = message;
+    alertText.textContent = mensagem;
+    alertBox.className = `form-alert ${tipo}`;
+    
+    if (tipo === "success") {
+        alertIcon.className = "fa-solid fa-circle-check";
+    } else if (tipo === "warning") {
+        alertIcon.className = "fa-solid fa-triangle-exclamation";
+    } else {
+        alertIcon.className = "fa-solid fa-circle-exclamation";
+    }
 
-    const icons = {
-        success: '<i class="fa-solid fa-check"></i>',
-        error: '<i class="fa-solid fa-exclamation"></i>',
-        warning: '<i class="fa-solid fa-triangle-exclamation"></i>',
-        info: '<i class="fa-solid fa-circle-info"></i>'
-    };
+    alertBox.style.display = "flex";
 
-    document.getElementById("toastIcon").innerHTML = icons[type] || icons.info;
+    // Limpa temporizador anterior se houver
+    if (alertaTimeouts[formId]) {
+        clearTimeout(alertaTimeouts[formId]);
+    }
 
-    toast.className = type;
-    toast.classList.add("show");
-
-    clearTimeout(toastTimeout);
-
-    toastTimeout = setTimeout(hideToast, 4500);
+    // Se passou uma duração (em milissegundos), faz sumir sozinho
+    if (duracao > 0) {
+        alertaTimeouts[formId] = setTimeout(() => {
+            limparAlerta(formId);
+        }, duracao);
+    }
 }
 
-function hideToast() {
-    document.getElementById("toast").classList.remove("show");
+function limparAlerta(formId) {
+    const alertBox = document.getElementById(`${formId}Alert`);
+    if (alertBox) {
+        alertBox.style.display = "none";
+    }
 }
 
-function closePopup() {
-    document.getElementById("popup-root")?.classList.remove("active");
-}
-
-
-// MENSAGENS DE ERRO MAIS CLARAS
+// MENSAGENS DE ERRO CLARAS
 function mensagemErroAuth(error) {
     const mensagem = (error.message || "").toLowerCase();
 
     if (mensagem.includes("invalid login credentials")) {
         return "E-mail ou senha incorretos.";
     }
-
     if (mensagem.includes("email not confirmed")) {
         return "Confirme seu e-mail antes de entrar.";
     }
-
-    if (mensagem.includes("password")) {
-        return "Verifique a senha e tente novamente.";
+    if (mensagem.includes("user already registered")) {
+        return "Este e-mail já está cadastrado.";
     }
 
     return error.message || "Não foi possível concluir a operação.";
 }
 
-
 // LOGIN REAL
 async function handleLogin(event) {
     event.preventDefault();
+    limparAlerta("login");
 
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value;
@@ -113,52 +111,44 @@ async function handleLogin(event) {
     botao.disabled = true;
 
     try {
-        const { data, error } =
-            await supabaseClient.auth.signInWithPassword({
-                email,
-                password
-            });
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
 
         if (error) throw error;
-
-        if (!data.session) {
-            throw new Error("Não foi possível iniciar a sessão.");
-        }
-
-        showToast("Login realizado com sucesso.", "success");
+        if (!data.session) throw new Error("Não foi possível iniciar a sessão.");
 
         window.location.replace("../core/index.html");
 
     } catch (error) {
-        showToast(mensagemErroAuth(error), "error");
-    } finally {
+        mostrarAlerta("login", mensagemErroAuth(error), "error");
         botao.disabled = false;
     }
 }
 
-
 // CADASTRO REAL
 async function handleRegister(event) {
     event.preventDefault();
+    limparAlerta("register");
 
     const nome = document.getElementById("regUser").value.trim();
     const email = document.getElementById("regEmail").value.trim();
     const password = document.getElementById("regPassword").value;
-    const confirmacao =
-        document.getElementById("regConfirmPassword").value;
+    const confirmacao = document.getElementById("regConfirmPassword").value;
 
     if (!nome) {
-        showToast("Informe seu nome de usuário.", "warning");
+        mostrarAlerta("register", "Informe seu nome de usuário.", "warning", 5000);
         return;
     }
 
     if (password.length < 8) {
-        showToast("Use uma senha com pelo menos 8 caracteres.", "warning");
+        mostrarAlerta("register", "Use uma senha com pelo menos 8 caracteres.", "warning", 5000);
         return;
     }
 
     if (password !== confirmacao) {
-        showToast("As senhas não coincidem.", "error");
+        mostrarAlerta("register", "As senhas não coincidem.", "error");
         return;
     }
 
@@ -170,89 +160,77 @@ async function handleRegister(event) {
             email,
             password,
             options: {
-                data: {
-                    username: nome
-                },
-                emailRedirectTo:
-                    new URL("auth_index.html", window.location.href).href
+                data: { username: nome },
+                emailRedirectTo: new URL("auth_index.html", window.location.href).href
             }
         });
 
         if (error) throw error;
 
         if (data.session) {
-            showToast("Conta criada com sucesso.", "success");
             window.location.replace("../core/index.html");
             return;
         }
 
-        showToast(
-            "Cadastro iniciado. Confira seu e-mail para confirmar a conta.",
-            "success"
+        mostrarAlerta(
+            "register",
+            "Cadastro realizado! Confira seu e-mail para confirmar a conta.",
+            "success", 5000
         );
 
         document.getElementById("loginEmail").value = email;
-        switchTab("login");
+        setTimeout(() => switchTab("login"), 3000);
 
     } catch (error) {
-        showToast(mensagemErroAuth(error), "error");
-    } finally {
+        mostrarAlerta("register", mensagemErroAuth(error), "error");
         botao.disabled = false;
     }
 }
 
-
 // RECUPERAÇÃO DE SENHA
 async function openForgotPassword(event) {
     event.preventDefault();
+    limparAlerta("login");
 
     const email = document.getElementById("loginEmail").value.trim();
 
     if (!email) {
-        showToast(
-            "Informe seu e-mail no campo de login primeiro.",
-            "warning"
-        );
+        mostrarAlerta("login", "Informe seu e-mail no campo de login primeiro.", "warning", 5000);
         return;
     }
 
-    const redirectTo =
-        `${window.location.origin}${window.location.pathname}?redefinir=1`;
+    const redirectTo = `${window.location.origin}${window.location.pathname}?redefinir=1`;
 
     try {
-        const { error } =
-            await supabaseClient.auth.resetPasswordForEmail(email, {
-                redirectTo
-            });
-
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
         if (error) throw error;
 
-        showToast(
-            "Se o e-mail puder receber a recuperação, você receberá as instruções.",
-            "success"
+        mostrarAlerta(
+            "login",
+            "Instruções enviadas! Verifique sua caixa de entrada.",
+            "success", 5000
         );
 
     } catch (error) {
-        showToast(mensagemErroAuth(error), "error");
+        mostrarAlerta("login", mensagemErroAuth(error), "error");
     }
 }
-
 
 // SALVAR A NOVA SENHA
 async function handleUpdatePassword(event) {
     event.preventDefault();
+    limparAlerta("reset");
 
     const password = document.getElementById("newPassword").value;
-    const confirmacao =
-        document.getElementById("confirmNewPassword").value;
+    const confirmacao = document.getElementById("confirmNewPassword").value;
 
     if (password.length < 8) {
-        showToast("Use pelo menos 8 caracteres.", "warning");
+        mostrarAlerta("reset", "Use pelo menos 8 caracteres.", "warning" , 5000);
         return;
     }
 
     if (password !== confirmacao) {
-        showToast("As senhas não coincidem.", "error");
+        mostrarAlerta("reset", "As senhas não coincidem.", "error");
         return;
     }
 
@@ -260,42 +238,31 @@ async function handleUpdatePassword(event) {
     botao.disabled = true;
 
     try {
-        const { data: sessionData } =
-            await supabaseClient.auth.getSession();
+        const { data: sessionData } = await supabaseClient.auth.getSession();
 
         if (!sessionData.session) {
-            throw new Error(
-                "O link expirou. Solicite uma nova recuperação de senha."
-            );
+            throw new Error("O link expirou. Solicite uma nova recuperação de senha.");
         }
 
-        const { error } = await supabaseClient.auth.updateUser({
-            password
-        });
-
+        const { error } = await supabaseClient.auth.updateUser({ password });
         if (error) throw error;
 
         await supabaseClient.auth.signOut();
-
         history.replaceState(null, "", window.location.pathname);
-
         document.getElementById("resetForm").reset();
 
-        showToast("Senha alterada. Entre novamente.", "success");
+        mostrarAlerta("login", "Senha alterada com sucesso. Entre novamente.", "success" , 5000);
         switchTab("login");
 
     } catch (error) {
-        showToast(mensagemErroAuth(error), "error");
-    } finally {
+        mostrarAlerta("reset", mensagemErroAuth(error), "error");
         botao.disabled = false;
     }
 }
 
-
 // VERIFICAR SESSÃO AO ABRIR A PÁGINA
 async function iniciarAutenticacao() {
-    const redefinindoSenha =
-        new URLSearchParams(window.location.search).get("redefinir") === "1";
+    const redefinindoSenha = new URLSearchParams(window.location.search).get("redefinir") === "1";
 
     if (redefinindoSenha) {
         switchTab("reset");
@@ -310,3 +277,7 @@ async function iniciarAutenticacao() {
 }
 
 document.addEventListener("DOMContentLoaded", iniciarAutenticacao);
+
+
+
+mostrarAlerta
