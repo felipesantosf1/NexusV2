@@ -22,7 +22,7 @@
             <p class="auth-subtitle" id="authSubtitle">Entre com suas credenciais para continuar</p>
         </div>
 
-        <div class="auth-tabs">
+        <div class="auth-tabs" id="authTabs">
             <button class="auth-tab active" id="tabLoginBtn" onclick="switchTab('login')">Entrar</button>
             <button class="auth-tab" id="tabRegisterBtn" onclick="switchTab('register')">Cadastrar</button>
         </div>
@@ -30,8 +30,9 @@
         <!-- LOGIN: Senha -->
         <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
             <div class="form-group">
-                <label class="form-label" for="loginEmail">E-mail ou Usuário</label>
-                <input class="form-input" type="text" id="loginEmail" placeholder="seu@email.com" required>
+                <label class="form-label" for="loginEmail">E-mail</label>
+
+                <input class="form-input" type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="email" required>
             </div>
 
             <div class="form-group">
@@ -82,10 +83,51 @@
             <button type="submit" class="btn-submit">Criar Conta</button>
             <p class="auth-footer-text">Já possui uma conta? <a onclick="switchTab('login')">Faça login</a></p>
         </form>
+
+        <!-- REDEFINIÇÃO DE SENHA -->
+        <form
+            class="auth-form"
+            id="resetForm"
+            onsubmit="handleUpdatePassword(event)"
+        >
+            <div class="form-group">
+                <label class="form-label" for="newPassword">
+                    Nova senha
+                </label>
+
+                <input
+                    class="form-input"
+                    type="password"
+                    id="newPassword"
+                    minlength="8"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="confirmNewPassword">
+                    Confirmar nova senha
+                </label>
+
+                <input
+                    class="form-input"
+                    type="password"
+                    id="confirmNewPassword"
+                    minlength="8"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn-submit">
+                Atualizar senha
+            </button>
+        </form>
     </div>
 
     <div id="toast">
-        <span class="toast-icon" id="toastIcon">ℹ️</span>
+        <span class="toast-icon" id="toastIcon"><i class="fa-solid fa-circle-info"></i></span>
         <span class="toast-message" id="toastMessage">Mensagem do sistema</span>
         <button class="toast-close" onclick="hideToast()">✕</button>
     </div>
@@ -104,6 +146,9 @@
     <!-- BIBLIOTECA -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../shared/supabase-config.js"></script>
+    <script src="../shared/supabase-client.js"></script>
     <script src="auth_code.js"></script>
 </body>
 </html>
