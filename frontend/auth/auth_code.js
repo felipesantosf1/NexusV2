@@ -40,7 +40,7 @@ function switchTab(tab) {
     );
 
     const textos = {
-        login: ["Acessar NexusPM", "Entre com seu e-mail e senha."],
+        login: ["Acessar Nexus", "Entre com seu e-mail e senha."],
         register: ["Criar conta", "Cadastre-se para acessar o projeto."],
         reset: ["Redefinir senha", "Escolha uma nova senha para sua conta."]
     };
@@ -58,7 +58,7 @@ function showToast(message, type = "info") {
 
     const icons = {
         success: '<i class="fa-solid fa-check"></i>',
-        error: '<i class="fa-solid fa-x"></i>',
+        error: '<i class="fa-solid fa-exclamation"></i>',
         warning: '<i class="fa-solid fa-triangle-exclamation"></i>',
         info: '<i class="fa-solid fa-circle-info"></i>'
     };
