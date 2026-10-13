@@ -20,17 +20,22 @@ class VinculoCronograma(BaseModel):
 
 
 @router.get("/")
-def listar_cronogramas(
-    dados=Depends(get_db),
-    usuario=Depends(get_current_user),
-):
+def listar_cronogramas(dados=Depends(get_db), usuario=Depends(get_current_user)):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
     cursor.execute(
         """
-        SELECT id, usuario_id, matriz_id, nome, created_at
-        FROM cronogramas
-        WHERE usuario_id = %s
-        ORDER BY created_at;
+        SELECT
+            c.id,
+            c.usuario_id,
+            c.matriz_id,
+            COALESCE(m.nome, c.nome) AS nome,
+            c.created_at
+        FROM cronogramas AS c
+        LEFT JOIN matrizes AS m
+            ON m.id = c.matriz_id
+            AND m.usuario_id = c.usuario_id
+        WHERE c.usuario_id = %s
+        ORDER BY c.created_at;
         """,
         [str(usuario["id"])],
     )

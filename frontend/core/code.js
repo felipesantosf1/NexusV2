@@ -1,14 +1,10 @@
-renderizarRaci
-
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
 const supabaseClient = window.supabaseClient;
 
 const seletorMatriz = document.getElementById("matrixSelect-raci");
-const tituloMatriz = document.querySelector(
-    ".raci-panel .matrix-title-row h2"
-);
+const tituloMatriz = document.querySelector(".raci-panel .matrix-title-row h2");
 const tabelaRaci = document.querySelector(".raci-table");
 const cabecalhoRaci = tabelaRaci.querySelector("thead");
 const corpoRaci = tabelaRaci.querySelector("tbody");
@@ -20,6 +16,7 @@ const menuRaci = document.getElementById("menu-raci");
 
 let atribuicaoAlvoRaci = null;
 let cronogramasUsuario = [];
+let versaoRenderGantt = 0;
 
 // O seletor ficará fora da tabela para não ser cortado pelo scroll.
 document.body.appendChild(menuRaci);
@@ -124,21 +121,30 @@ async function carregarMatrizes(idSelecionado = null) {
 
 // CARREGAR TAREFAS, MEMBROS E PAPÉIS DA MATRIZ
 async function carregarDadosRaci(matrizId) {
-    matrizAtualId = matrizId;
+    matrizAtualId = String(matrizId);
 
-    dadosRaci = await requisicaoApi(
-        `/matrizes/${matrizId}/raci`
+    const opcaoMatriz = [...seletorMatriz.options].find(
+        opcao => opcao.value === matrizAtualId
     );
 
-    const opcao = seletorMatriz.selectedOptions[0];
+    if (opcaoMatriz) {
+        seletorMatriz.value = matrizAtualId;
+    }
 
-    if (opcao && opcao.value === matrizId) {
-        tituloMatriz.textContent = opcao.textContent;
+    dadosRaci = await requisicaoApi(
+        `/matrizes/${matrizAtualId}/raci`
+    );
+
+    if (opcaoMatriz) {
+        tituloMatriz.textContent = opcaoMatriz.textContent;
     }
 
     renderizarRaci();
+
     await atualizarEstadoMenuMatriz();
+    await renderizarGanttVinculado();
 }
+
 
 // EDIÇÃO DE TEXTO COM DUPLO CLIQUE
 function ativarEdicaoDuploClique(elemento, salvar, depoisDeSalvar) {
@@ -276,13 +282,7 @@ async function excluirMembro(membro) {
     }
 }
 
-
-
-
-
-
 // DEFINIR OU REMOVER UM PAPEL RACIS
-
 function fecharMenuRaci() {
     menuRaci.classList.add("hidden");
     atribuicaoAlvoRaci = null;
@@ -367,15 +367,6 @@ async function salvarPapelRaci(papel) {
         showToast(`Não foi possível salvar o papel: ${error.message}`);
     }
 }
-
-
-
-
-
-
-
-
-
 
 // MONTAR A TABELA RACIS COM DADOS REAIS
 function renderizarRaci() {
@@ -521,7 +512,13 @@ ativarEdicaoDuploClique(
     },
     async nome => {
         const opcao = seletorMatriz.selectedOptions[0];
-        if (opcao) opcao.textContent = nome;
+
+        if (opcao) {
+            opcao.textContent = nome;
+        }
+
+        await atualizarEstadoMenuMatriz();
+        await renderizarGanttVinculado();
     }
 );
 
@@ -557,6 +554,43 @@ async function adicionarTarefa() {
 
         await carregarDadosRaci(matrizAtualId);
         showToast("Tarefa criada.");
+    } catch (error) {
+        showToast(`Erro ao criar tarefa: ${error.message}`);
+    }
+}
+
+async function adicionarTarefaGantt() {
+    const cronograma = cronogramasUsuario.find(
+        item => item.id === document.getElementById("ganttSelect").value
+    );
+
+    if (!cronograma?.matriz_id) {
+        showToast(
+            "Vincule o cronograma a uma matriz antes de adicionar tarefas."
+        );
+        return;
+    }
+
+    const nome = prompt("Nome da nova tarefa:");
+    if (nome === null) return;
+
+    if (!nome.trim()) {
+        showToast("Informe o nome da tarefa.");
+        return;
+    }
+
+    try {
+        await requisicaoApi(
+            `/matrizes/${cronograma.matriz_id}/tarefas-raci`,
+            {
+                method: "POST",
+                body: JSON.stringify({ nome: nome.trim() })
+            }
+        );
+
+        await carregarDadosRaci(cronograma.matriz_id);
+
+        showToast("Tarefa adicionada à matriz e ao cronograma.");
     } catch (error) {
         showToast(`Erro ao criar tarefa: ${error.message}`);
     }
@@ -670,6 +704,194 @@ async function atualizarEstadoMenuMatriz() {
     }
 }
 
+async function renderizarGanttVinculado() {
+    const versao = ++versaoRenderGantt;
+
+    const seletorGantt = document.getElementById("ganttSelect");
+    const colunaTarefas = document.querySelector(".gantt-task-column");
+    const timeline = document.querySelector(".gantt-timeline");
+
+    const tituloGantt = document.querySelector(
+        "#view-gantt .gantt-panel .matrix-title-row h2"
+    );
+
+    const tituloContexto = document.querySelector(
+        ".gantt-context-card strong"
+    );
+
+    const descricaoContexto = document.querySelector(
+        ".gantt-context-card small"
+    );
+
+    const seloVinculo = document.querySelector(".connected-pill");
+
+    if (!colunaTarefas || !timeline) return;
+
+    // Identifica o cronograma selecionado.
+    const cronograma =
+        cronogramasUsuario.find(
+            item => item.id === seletorGantt.value
+        ) ||
+        cronogramasUsuario.find(
+            item => String(item.matriz_id) === String(matrizAtualId)
+        ) ||
+        null;
+
+    // Remove as linhas estáticas ou renderizadas anteriormente.
+    colunaTarefas.querySelectorAll(".gantt-task-row")
+        .forEach(linha => linha.remove());
+
+    timeline.querySelectorAll(".gantt-grid-row")
+        .forEach(linha => linha.remove());
+
+    function adicionarLinhaVazia(nome, detalhe) {
+        const linha = document.createElement("div");
+        linha.className = "gantt-task-row";
+
+        const texto = document.createElement("span");
+        texto.textContent = nome;
+
+        const status = document.createElement("small");
+        status.textContent = detalhe;
+
+        linha.append(texto, status);
+        colunaTarefas.appendChild(linha);
+
+        const linhaTempo = document.createElement("div");
+        linhaTempo.className = "gantt-grid-row";
+        timeline.appendChild(linhaTempo);
+    }
+
+    const vinculado = Boolean(cronograma?.matriz_id);
+
+    if (tituloGantt) {
+        tituloGantt.textContent = cronograma?.nome || "Cronograma Gantt";
+    }
+
+    if (tituloContexto) {
+        tituloContexto.textContent = vinculado
+            ? `Cronograma vinculado à matriz "${cronograma.nome}"`
+            : "Cronograma independente";
+    }
+
+    if (descricaoContexto) {
+        descricaoContexto.textContent = vinculado
+            ? "Tarefas e nomes sincronizados com a matriz RACIS."
+            : "Vincule uma matriz para compartilhar as tarefas.";
+    }
+
+    if (seloVinculo) {
+        seloVinculo.hidden = !vinculado;
+
+        if (vinculado) {
+            seloVinculo.innerHTML =
+                '<i class="fa-solid fa-check"></i> Vinculado';
+        }
+    }
+
+    if (!cronograma) {
+        adicionarLinhaVazia(
+            "Nenhum cronograma selecionado",
+            "Sem vínculo"
+        );
+        return;
+    }
+
+    if (!cronograma.matriz_id) {
+        adicionarLinhaVazia(
+            "Nenhuma matriz vinculada",
+            "Cronograma independente"
+        );
+        return;
+    }
+
+    let tarefas;
+
+    try {
+        // Reutiliza os dados já carregados quando possível.
+        if (
+            String(cronograma.matriz_id) === String(matrizAtualId)
+        ) {
+            tarefas = dadosRaci.tarefas;
+        } else {
+            // Consulta a matriz associada ao cronograma selecionado.
+            const dados = await requisicaoApi(
+                `/matrizes/${cronograma.matriz_id}/raci`
+            );
+
+            tarefas = dados.tarefas || [];
+        }
+    } catch (error) {
+        if (versao !== versaoRenderGantt) return;
+
+        adicionarLinhaVazia(
+            "Não foi possível carregar as tarefas",
+            "Erro de carregamento"
+        );
+
+        console.error("Erro ao carregar tarefas do Gantt:", error);
+        return;
+    }
+
+    // Evita renderizar uma resposta antiga se houver outra atualização.
+    if (versao !== versaoRenderGantt) return;
+
+    if (!tarefas.length) {
+        adicionarLinhaVazia(
+            "Nenhuma tarefa cadastrada",
+            "Adicione uma tarefa à matriz"
+        );
+        return;
+    }
+
+    tarefas.forEach((tarefa, indice) => {
+        const linha = document.createElement("div");
+        linha.className = "gantt-task-row";
+
+        const grupo = document.createElement("span");
+
+        const numero = document.createElement("b");
+        numero.textContent = String(indice + 1).padStart(2, "0");
+
+        const nomeTarefa = document.createElement("span");
+        nomeTarefa.textContent = tarefa.nome;
+        nomeTarefa.title = "Dê dois cliques para renomear";
+
+        grupo.append(numero, nomeTarefa);
+        linha.appendChild(grupo);
+
+        const status = document.createElement("small");
+        status.textContent = "Sem datas";
+        linha.appendChild(status);
+
+        colunaTarefas.appendChild(linha);
+
+        // Uma linha temporal correspondente a cada tarefa.
+        const linhaTempo = document.createElement("div");
+        linhaTempo.className = "gantt-grid-row";
+        timeline.appendChild(linhaTempo);
+
+        // Renomear no Gantt também altera a tarefa da matriz.
+        ativarEdicaoDuploClique(
+            nomeTarefa,
+
+            async novoNome => {
+                await requisicaoApi(
+                    `/matrizes/${cronograma.matriz_id}/tarefas-raci/${tarefa.id}`,
+                    {
+                        method: "PUT",
+                        body: JSON.stringify({ nome: novoNome })
+                    }
+                );
+            },
+
+            async () => {
+                await carregarDadosRaci(cronograma.matriz_id);
+            }
+        );
+    });
+}
+
 function fecharMenuMatriz() {
     menuMatriz.classList.add("hidden");
     botaoMenuMatriz.setAttribute("aria-expanded", "false");
@@ -750,6 +972,7 @@ async function excluirMatrizAtual() {
     }
 }
 
+
 async function vincularMatrizAGantt() {
     await atualizarEstadoMenuMatriz();
 
@@ -758,7 +981,9 @@ async function vincularMatrizAGantt() {
     );
 
     if (vinculado) {
-        if (!confirm(`Desvincular "${vinculado.nome}" desta matriz? O cronograma será mantido.`)) {
+        if (!confirm(
+            `Desvincular "${vinculado.nome}" desta matriz? O cronograma será mantido.`
+        )) {
             return;
         }
 
@@ -771,6 +996,8 @@ async function vincularMatrizAGantt() {
         );
 
         await atualizarEstadoMenuMatriz();
+        await renderizarGanttVinculado();
+
         showToast("Cronograma desvinculado. Os dados foram mantidos.");
         return;
     }
@@ -829,8 +1056,11 @@ async function vincularMatrizAGantt() {
     );
 
     await atualizarEstadoMenuMatriz();
+    await renderizarGanttVinculado();
+
     showToast("Matriz vinculada ao gráfico de Gantt.");
 }
+
 
 async function abrirCronogramaVinculado() {
     await atualizarEstadoMenuMatriz();
@@ -856,7 +1086,6 @@ async function abrirCronogramaVinculado() {
 
     document.querySelector('[data-view="gantt"]').click();
 }
-
 
 // ALTERNAR ENTRE RACIS E GANTT
 document.querySelectorAll("[data-view]").forEach(botao => {
@@ -918,6 +1147,8 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
                 botao.disabled = false;
             }
         });
+    } else if (acao === "nova-tarefa") {
+        botao.addEventListener("click", adicionarTarefaGantt);
     } else if (acao === "adicionar-tarefa") {
         botao.addEventListener("click", adicionarTarefa);
     } else if (acao === "adicionar-membro") {
@@ -1001,5 +1232,24 @@ document.addEventListener("click", event => {
     }
 });
 
+document.getElementById("ganttSelect").addEventListener(
+    "change",
+    async event => {
+        const cronograma = cronogramasUsuario.find(
+            item => item.id === event.target.value
+        );
+
+        if (cronograma?.matriz_id) {
+            try {
+                await carregarDadosRaci(cronograma.matriz_id);
+            } catch (error) {
+                console.error(error);
+                showToast("Não foi possível carregar a matriz vinculada.");
+            }
+        } else {
+            await renderizarGanttVinculado();
+        }
+    }
+);
 
 verificarSessao();
