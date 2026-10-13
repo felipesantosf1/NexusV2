@@ -113,3 +113,5 @@
 .menu-item-grafico.danger:hover:not(:disabled) {
     background: #392426;
 }
+
+.connected-pill.is-disconnected { background-color: #3a2626; color: #f59b9b; border-color: #604444;}

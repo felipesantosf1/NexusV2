@@ -1,5 +1,3 @@
-atualizarEstadoMenuMatriz
-
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
@@ -676,11 +674,19 @@ async function verificarSessao() {
 }
 
 
-async function atualizarEstadoMenuMatriz() {
+// ALTERADO: atualiza o vínculo da matriz e preserva o gráfico correto.
+async function atualizarEstadoMenuMatriz(cronogramaSelecionadoId = null) {
+    const seletorGantt = document.getElementById("ganttSelect");
+    const selecaoAnterior = seletorGantt.value;
+
     cronogramasUsuario = await requisicaoApi("/cronogramas/");
 
+    // ALTERADO: compara os IDs sem depender do tipo (texto ou número).
     const vinculado = cronogramasUsuario.find(
-        cronograma => String(cronograma.matriz_id) === String(matrizAtualId)
+        cronograma =>
+            matrizAtualId != null &&
+            cronograma.matriz_id != null &&
+            String(cronograma.matriz_id) === String(matrizAtualId)
     );
 
     menuMatriz.dataset.hasCronograma = vinculado ? "true" : "false";
@@ -697,7 +703,6 @@ async function atualizarEstadoMenuMatriz() {
         '[data-action="open-cronograma"]'
     ).hidden = !vinculado;
 
-    const seletorGantt = document.getElementById("ganttSelect");
     seletorGantt.replaceChildren();
 
     cronogramasUsuario.forEach(cronograma => {
@@ -707,12 +712,32 @@ async function atualizarEstadoMenuMatriz() {
         seletorGantt.appendChild(opcao);
     });
 
-    if (vinculado) {
-        seletorGantt.value = vinculado.id;
+    // ALTERADO: prioriza o gráfico informado, como um gráfico recém-criado.
+    const novoGraficoExiste =
+        cronogramaSelecionadoId != null &&
+        cronogramasUsuario.some(
+            cronograma =>
+                String(cronograma.id) === String(cronogramaSelecionadoId)
+        );
+
+    // ALTERADO: se não houver ID informado, preserva o gráfico anterior.
+    const selecaoAnteriorExiste = cronogramasUsuario.some(
+        cronograma => String(cronograma.id) === String(selecaoAnterior)
+    );
+
+    if (novoGraficoExiste) {
+        seletorGantt.value = String(cronogramaSelecionadoId);
+    } else if (vinculado) {
+        seletorGantt.value = String(vinculado.id);
+    } else if (selecaoAnteriorExiste) {
+        seletorGantt.value = String(selecaoAnterior);
+    } else if (cronogramasUsuario.length > 0) {
+        seletorGantt.value = String(cronogramasUsuario[0].id);
+    } else {
+        seletorGantt.value = "";
     }
 
-    // atualiza as opções do menu do gráfico
-    // conforme o cronograma que ficou selecionado.
+    // ALTERADO: atualiza as opções de acordo com o gráfico selecionado.
     atualizarEstadoMenuGrafico();
 }
 
@@ -1004,10 +1029,16 @@ async function renderizarGanttVinculado() {
     // Identifica o cronograma selecionado.
     const cronograma =
         cronogramasUsuario.find(
-            item => item.id === seletorGantt.value
+            item => String(item.id) === String(seletorGantt.value)
         ) ||
-        cronogramasUsuario.find(
-            item => String(item.matriz_id) === String(matrizAtualId)
+        (
+            matrizAtualId != null
+                ? cronogramasUsuario.find(
+                    item =>
+                        item.matriz_id != null &&
+                        String(item.matriz_id) === String(matrizAtualId)
+                )
+                : null
         ) ||
         null;
 
@@ -1055,11 +1086,17 @@ async function renderizarGanttVinculado() {
     }
 
     if (seloVinculo) {
-        seloVinculo.hidden = !vinculado;
+        seloVinculo.hidden = !cronograma;
 
-        if (vinculado) {
-            seloVinculo.innerHTML =
-                '<i class="fa-solid fa-check"></i> Vinculado';
+        seloVinculo.classList.toggle(
+            "is-disconnected",
+            Boolean(cronograma) && !vinculado
+        );
+
+        if (cronograma) {
+            seloVinculo.innerHTML = vinculado
+                ? '<i class="fa-solid fa-check"></i> Vinculado'
+                : '<i class="fa-solid fa-link-slash"></i> Não vinculado';
         }
     }
 
@@ -1285,7 +1322,10 @@ async function vincularMatrizAGantt() {
     await atualizarEstadoMenuMatriz();
 
     const vinculado = cronogramasUsuario.find(
-        cronograma => cronograma.matriz_id === matrizAtualId
+        cronograma =>
+            matrizAtualId != null &&
+            cronograma.matriz_id != null &&
+            String(cronograma.matriz_id) === String(matrizAtualId)
     );
 
     if (vinculado) {
@@ -1509,21 +1549,6 @@ document.getElementById("teamButton").addEventListener("click", () => {
     showToast("A seleção de equipe será implementada posteriormente.");
 });
 
-botaoMenuMatriz.addEventListener("click", event => {
-    event.stopPropagation();
-
-    const vaiAbrir = menuMatriz.classList.contains("hidden");
-
-    menuMatriz.classList.toggle("hidden", !vaiAbrir);
-    botaoMenuMatriz.setAttribute("aria-expanded", String(vaiAbrir));
-});
-
-document.addEventListener("click", event => {
-    if (!wrapperMenuMatriz.contains(event.target)) {
-        fecharMenuMatriz();
-    }
-});
-
 document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
         fecharMenuMatriz();
@@ -1602,8 +1627,10 @@ document.getElementById("ganttSelect").addEventListener(
     "change",
     async event => {
         const cronograma = cronogramasUsuario.find(
-            item => item.id === event.target.value
+            item => String(item.id) === String(event.target.value)
         );
+
+        atualizarEstadoMenuGrafico();
 
         if (cronograma?.matriz_id) {
             try {
