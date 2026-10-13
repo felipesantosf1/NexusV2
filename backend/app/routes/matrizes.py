@@ -25,12 +25,11 @@ def listar_matrizes(
 
     cursor.execute(
         """
-        SELECT id, usuario_id, nome, created_at
-        FROM matrizes
-        WHERE usuario_id = %s
-        ORDER BY created_at DESC;
+        INSERT INTO matrizes (nome, usuario_id, is_padrao)
+        VALUES (%s, %s, TRUE)
+        RETURNING id, usuario_id, nome, created_at;
         """,
-        [str(usuario["id"])],
+        ["Matriz Padrão", str(usuario["id"])],
     )
 
     matrizes = cursor.fetchall()
