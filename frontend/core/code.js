@@ -2,23 +2,32 @@
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
-
 const supabaseClient = window.supabaseClient;
-
-let toastTimer;
 
 const seletorMatriz = document.getElementById("matrixSelect-raci");
 const tituloMatriz = document.querySelector(
     ".raci-panel .matrix-title-row h2"
 );
+const tabelaRaci = document.querySelector(".raci-table");
+const cabecalhoRaci = tabelaRaci.querySelector("thead");
+const corpoRaci = tabelaRaci.querySelector("tbody");
 
-// Envia requisições para a API usando a sessão atual do Supabase.
+let toastTimer;
+let matrizAtualId = null;
+
+let dadosRaci = {
+    tarefas: [],
+    membros: [],
+    atribuicoes: []
+};
+
+const papeisRaci = ["R", "A", "C", "I", "S"];
+
+// COMUNICAÇÃO COM A API: SEMPRE ENVIA O TOKEN DO USUÁRIO
 async function requisicaoApi(caminho, opcoes = {}) {
     const { data, error } = await supabaseClient.auth.getSession();
 
-    if (error) {
-        throw error;
-    }
+    if (error) throw error;
 
     const token = data.session?.access_token;
 
@@ -51,92 +60,480 @@ async function requisicaoApi(caminho, opcoes = {}) {
     }
 
     if (!resposta.ok) {
+        const detalhe = resultado?.detail;
         throw new Error(
-            resultado?.detail || `Erro HTTP ${resposta.status}`
+            typeof detalhe === "string"
+                ? detalhe
+                : `Erro HTTP ${resposta.status}`
         );
     }
 
     return resultado;
 }
 
-// Busca as matrizes que pertencem ao usuário autenticado.
+// NOTIFICAÇÕES
+function showToast(mensagem) {
+    toast.textContent = mensagem;
+    toast.classList.add("show");
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+    }, 3500);
+}
+
+// CARREGAR MATRIZES DO USUÁRIO
 async function carregarMatrizes(idSelecionado = null) {
     const matrizes = await requisicaoApi("/matrizes/");
 
     seletorMatriz.replaceChildren();
 
-    if (matrizes.length === 0) {
-        const opcao = document.createElement("option");
-        opcao.value = "";
-        opcao.textContent = "Nenhuma matriz criada";
-
-        seletorMatriz.appendChild(opcao);
-        tituloMatriz.textContent = "Nenhuma matriz criada";
-        return;
-    }
-
     matrizes.forEach(matriz => {
         const opcao = document.createElement("option");
-
         opcao.value = matriz.id;
         opcao.textContent = matriz.nome;
-
         seletorMatriz.appendChild(opcao);
     });
+
+    if (!matrizes.length) {
+        matrizAtualId = null;
+        tituloMatriz.textContent = "Nenhuma matriz";
+        renderizarRaci();
+        return;
+    }
 
     const selecionada =
         matrizes.find(matriz => matriz.id === idSelecionado) ||
         matrizes[0];
 
     seletorMatriz.value = selecionada.id;
-    tituloMatriz.textContent = selecionada.nome;
+    await carregarDadosRaci(selecionada.id);
 }
 
-// Atualiza o título quando o usuário seleciona outra matriz.
-seletorMatriz.addEventListener("change", () => {
+// CARREGAR TAREFAS, MEMBROS E PAPÉIS DA MATRIZ
+async function carregarDadosRaci(matrizId) {
+    matrizAtualId = matrizId;
+
+    dadosRaci = await requisicaoApi(
+        `/matrizes/${matrizId}/raci`
+    );
+
     const opcao = seletorMatriz.selectedOptions[0];
 
-    if (opcao && opcao.value) {
+    if (opcao && opcao.value === matrizId) {
         tituloMatriz.textContent = opcao.textContent;
+    }
+
+    renderizarRaci();
+}
+
+// EDIÇÃO DE TEXTO COM DUPLO CLIQUE
+function ativarEdicaoDuploClique(elemento, salvar, depoisDeSalvar) {
+    elemento.addEventListener("dblclick", () => {
+        if (elemento.dataset.editando === "true") return;
+
+        elemento.dataset.editando = "true";
+
+        const valorAnterior = elemento.textContent.trim();
+        const campo = document.createElement("input");
+
+        campo.type = "text";
+        campo.value = valorAnterior;
+        campo.maxLength = 150;
+        campo.className = "raci-inline-edit";
+
+        elemento.replaceWith(campo);
+        campo.focus();
+        campo.select();
+
+        let finalizado = false;
+
+        async function finalizar(confirmar) {
+            if (finalizado) return;
+            finalizado = true;
+
+            const novoValor = campo.value.trim();
+
+            if (
+                !confirmar ||
+                !novoValor ||
+                novoValor === valorAnterior
+            ) {
+                elemento.dataset.editando = "false";
+                campo.replaceWith(elemento);
+
+                if (confirmar && !novoValor) {
+                    showToast("O nome não pode ficar vazio.");
+                }
+                return;
+            }
+
+            campo.disabled = true;
+
+            try {
+                await salvar(novoValor);
+                elemento.textContent = novoValor;
+                elemento.dataset.editando = "false";
+                campo.replaceWith(elemento);
+
+                if (depoisDeSalvar) {
+                    await depoisDeSalvar(novoValor);
+                }
+            } catch (error) {
+                console.error("Erro ao salvar edição:", error);
+                showToast(`Não foi possível salvar: ${error.message}`);
+                elemento.dataset.editando = "false";
+                campo.replaceWith(elemento);
+            }
+        }
+
+        campo.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                finalizar(true);
+            }
+
+            if (event.key === "Escape") {
+                finalizar(false);
+            }
+        });
+
+        campo.addEventListener("blur", () => finalizar(true));
+    });
+}
+
+// BOTÃO DE EXCLUSÃO
+function criarBotaoExcluir(rotulo, acao) {
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "raci-delete-button";
+    botao.title = `Excluir ${rotulo}`;
+    botao.setAttribute("aria-label", `Excluir ${rotulo}`);
+    botao.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+    botao.addEventListener("click", async event => {
+        event.stopPropagation();
+        await acao();
+    });
+
+    return botao;
+}
+
+// APAGAR TAREFA
+async function excluirTarefa(tarefa) {
+    if (tarefa.is_padrao) {
+        showToast("A tarefa padrão não pode ser excluída.");
+        return;
+    }
+
+    if (!confirm(`Excluir a tarefa "${tarefa.nome}"?`)) return;
+
+    try {
+        await requisicaoApi(
+            `/matrizes/${matrizAtualId}/tarefas-raci/${tarefa.id}`,
+            { method: "DELETE" }
+        );
+
+        await carregarDadosRaci(matrizAtualId);
+        showToast("Tarefa excluída.");
+    } catch (error) {
+        showToast(`Erro ao excluir tarefa: ${error.message}`);
+    }
+}
+
+// APAGAR MEMBRO
+async function excluirMembro(membro) {
+    if (membro.is_padrao) {
+        showToast("O membro padrão não pode ser excluído.");
+        return;
+    }
+
+    if (!confirm(`Excluir o membro "${membro.nome}"?`)) return;
+
+    try {
+        await requisicaoApi(
+            `/matrizes/${matrizAtualId}/membros/${membro.id}`,
+            { method: "DELETE" }
+        );
+
+        await carregarDadosRaci(matrizAtualId);
+        showToast("Membro excluído.");
+    } catch (error) {
+        showToast(`Erro ao excluir membro: ${error.message}`);
+    }
+}
+
+// DEFINIR OU REMOVER UM PAPEL RACIS
+async function editarAtribuicao(tarefa, membro) {
+    const atual = dadosRaci.atribuicoes.find(item =>
+        item.tarefa_id === tarefa.id &&
+        item.membro_id === membro.id
+    );
+
+    const resposta = prompt(
+        "Digite R, A, C, I ou S. Deixe vazio para remover o papel.",
+        atual?.papel || ""
+    );
+
+    if (resposta === null) return;
+
+    const papel = resposta.trim().toUpperCase();
+
+    try {
+        if (!papel) {
+            if (!atual) return;
+
+            await requisicaoApi(
+                `/matrizes/${matrizAtualId}/atribuicoes/${tarefa.id}/${membro.id}`,
+                { method: "DELETE" }
+            );
+        } else {
+            if (!papeisRaci.includes(papel)) {
+                showToast("Use apenas R, A, C, I ou S.");
+                return;
+            }
+
+            await requisicaoApi(
+                `/matrizes/${matrizAtualId}/atribuicoes`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({
+                        tarefa_id: tarefa.id,
+                        membro_id: membro.id,
+                        papel
+                    })
+                }
+            );
+        }
+
+        await carregarDadosRaci(matrizAtualId);
+    } catch (error) {
+        showToast(`Não foi possível salvar o papel: ${error.message}`);
+    }
+}
+
+// MONTAR A TABELA RACIS COM DADOS REAIS
+function renderizarRaci() {
+    cabecalhoRaci.replaceChildren();
+    corpoRaci.replaceChildren();
+
+    const linhaCabecalho = document.createElement("tr");
+    const colunaTarefa = document.createElement("th");
+
+    colunaTarefa.className = "task-head";
+    colunaTarefa.textContent = "Tarefa / Atividade";
+    linhaCabecalho.appendChild(colunaTarefa);
+
+    dadosRaci.membros.forEach(membro => {
+        const th = document.createElement("th");
+        const cabecalhoMembro = document.createElement("span");
+        const nomeMembro = document.createElement("span");
+
+        cabecalhoMembro.className = "member-head";
+        nomeMembro.className = "member-name";
+        nomeMembro.textContent = membro.nome;
+        nomeMembro.title = "Dê dois cliques para editar";
+
+        ativarEdicaoDuploClique(
+            nomeMembro,
+            async nome => {
+                await requisicaoApi(
+                    `/matrizes/${matrizAtualId}/membros/${membro.id}`,
+                    {
+                        method: "PUT",
+                        body: JSON.stringify({ nome })
+                    }
+                );
+            },
+            async () => carregarDadosRaci(matrizAtualId)
+        );
+
+        cabecalhoMembro.appendChild(nomeMembro);
+
+        if (!membro.is_padrao) {
+            cabecalhoMembro.appendChild(
+                criarBotaoExcluir(
+                    membro.nome,
+                    () => excluirMembro(membro)
+                )
+            );
+        }
+
+        th.appendChild(cabecalhoMembro);
+        linhaCabecalho.appendChild(th);
+    });
+
+    cabecalhoRaci.appendChild(linhaCabecalho);
+
+    dadosRaci.tarefas.forEach((tarefa, indice) => {
+        const linha = document.createElement("tr");
+        const celulaTarefa = document.createElement("th");
+        const grupoTarefa = document.createElement("div");
+        const indiceTarefa = document.createElement("span");
+        const nomeTarefa = document.createElement("span");
+
+        celulaTarefa.scope = "row";
+        grupoTarefa.className = "raci-task-name";
+        indiceTarefa.className = "task-index";
+        indiceTarefa.textContent = String(indice + 1).padStart(2, "0");
+
+        nomeTarefa.className = "raci-editable-name";
+        nomeTarefa.textContent = tarefa.nome;
+        nomeTarefa.title = "Dê dois cliques para editar";
+
+        ativarEdicaoDuploClique(
+            nomeTarefa,
+            async nome => {
+                await requisicaoApi(
+                    `/matrizes/${matrizAtualId}/tarefas-raci/${tarefa.id}`,
+                    {
+                        method: "PUT",
+                        body: JSON.stringify({ nome })
+                    }
+                );
+            },
+            async () => carregarDadosRaci(matrizAtualId)
+        );
+
+        grupoTarefa.append(indiceTarefa, nomeTarefa);
+
+        if (!tarefa.is_padrao) {
+            grupoTarefa.appendChild(
+                criarBotaoExcluir(
+                    tarefa.nome,
+                    () => excluirTarefa(tarefa)
+                )
+            );
+        }
+
+        celulaTarefa.appendChild(grupoTarefa);
+        linha.appendChild(celulaTarefa);
+
+        dadosRaci.membros.forEach(membro => {
+            const celula = document.createElement("td");
+            const atribuicao = dadosRaci.atribuicoes.find(item =>
+                item.tarefa_id === tarefa.id &&
+                item.membro_id === membro.id
+            );
+
+            const botaoPapel = document.createElement("button");
+            botaoPapel.type = "button";
+            botaoPapel.className = atribuicao
+                ? `role-badge role-${atribuicao.papel.toLowerCase()}`
+                : "role-badge role-none";
+
+            botaoPapel.title = atribuicao
+                ? `Papel ${atribuicao.papel} — clique para alterar`
+                : "Sem atribuição — clique para definir";
+
+            botaoPapel.textContent = atribuicao
+                ? atribuicao.papel
+                : "+";
+
+            botaoPapel.addEventListener("click", () => {
+                editarAtribuicao(tarefa, membro);
+            });
+
+            celula.appendChild(botaoPapel);
+            linha.appendChild(celula);
+        });
+
+        corpoRaci.appendChild(linha);
+    });
+}
+
+// RENOMEAR UMA MATRIZ COM DUPLO CLIQUE
+ativarEdicaoDuploClique(
+    tituloMatriz,
+    async nome => {
+        await requisicaoApi(`/matrizes/${matrizAtualId}`, {
+            method: "PUT",
+            body: JSON.stringify({ nome })
+        });
+    },
+    async nome => {
+        const opcao = seletorMatriz.selectedOptions[0];
+        if (opcao) opcao.textContent = nome;
+    }
+);
+
+// SELECIONAR OUTRA MATRIZ
+seletorMatriz.addEventListener("change", async () => {
+    const matrizId = seletorMatriz.value;
+    if (!matrizId) return;
+
+    try {
+        await carregarDadosRaci(matrizId);
+    } catch (error) {
+        showToast(`Erro ao carregar matriz: ${error.message}`);
     }
 });
 
-// MOSTRAR NOTIFICAÇÕES
-function showToast(message) {
-    toast.textContent = message;
-    toast.classList.add("show");
+// CRIAR TAREFA
+async function adicionarTarefa() {
+    const nome = prompt("Nome da nova tarefa:");
+    if (nome === null) return;
+    if (!nome.trim()) {
+        showToast("Informe o nome da tarefa.");
+        return;
+    }
 
-    clearTimeout(toastTimer);
+    try {
+        await requisicaoApi(
+            `/matrizes/${matrizAtualId}/tarefas-raci`,
+            {
+                method: "POST",
+                body: JSON.stringify({ nome: nome.trim() })
+            }
+        );
 
-    toastTimer = setTimeout(() => {
-        toast.classList.remove("show");
-    }, 3200);
+        await carregarDadosRaci(matrizAtualId);
+        showToast("Tarefa criada.");
+    } catch (error) {
+        showToast(`Erro ao criar tarefa: ${error.message}`);
+    }
 }
 
-// PREENCHER O PERFIL COM OS DADOS DO SUPABASE
+// CRIAR MEMBRO
+async function adicionarMembro() {
+    const nome = prompt("Nome do novo membro:");
+    if (nome === null) return;
+    if (!nome.trim()) {
+        showToast("Informe o nome do membro.");
+        return;
+    }
+
+    try {
+        await requisicaoApi(
+            `/matrizes/${matrizAtualId}/membros`,
+            {
+                method: "POST",
+                body: JSON.stringify({ nome: nome.trim() })
+            }
+        );
+
+        await carregarDadosRaci(matrizAtualId);
+        showToast("Membro adicionado.");
+    } catch (error) {
+        showToast(`Erro ao adicionar membro: ${error.message}`);
+    }
+}
+
+// PERFIL
 function preencherPerfil(user) {
     const nome =
         user.user_metadata?.username ||
         user.email?.split("@")[0] ||
         "Usuário";
 
-    const email = user.email || "";
-
-    // Atualiza o nome nos dois locais do menu do usuário.
     document
         .querySelectorAll(".profile-copy strong, .dropdown-user strong")
-        .forEach(elemento => {
-            elemento.textContent = nome;
-        });
+        .forEach(el => el.textContent = nome);
 
-    // Atualiza o e-mail.
     document
         .querySelectorAll(".profile-copy small, .dropdown-user small")
-        .forEach(elemento => {
-            elemento.textContent = email;
-        });
+        .forEach(el => el.textContent = user.email || "");
 
-    // Gera as iniciais a partir do nome.
     const iniciais = nome
         .trim()
         .split(/\s+/)
@@ -147,160 +544,120 @@ function preencherPerfil(user) {
 
     document
         .querySelectorAll(".profile-avatar, .dropdown-user .avatar")
-        .forEach(elemento => {
-            elemento.textContent = iniciais;
-        });
+        .forEach(el => el.textContent = iniciais);
 }
 
-// PROTEGER A ÁREA PRINCIPAL
+// VALIDAR SESSÃO E CARREGAR DADOS
 async function verificarSessao() {
     try {
-        const { data, error } =
-            await supabaseClient.auth.getSession();
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
 
-        if (error) {
-            throw error;
-        }
-
-        // Sem sessão ativa, retorna para a tela de login.
         if (!data.session) {
             window.location.replace("../auth/auth_index.html");
             return;
         }
 
-        // Com sessão ativa, apresenta os dados do usuário.
         preencherPerfil(data.session.user);
-
-        try {
-            await carregarMatrizes();
-        } catch (error) {
-            console.error("Erro ao carregar matrizes:", error);
-            showToast(`Não foi possível carregar as matrizes: ${error.message}`);
-        }
-
+        await carregarMatrizes();
     } catch (error) {
-        console.error("Erro ao verificar a sessão:", error);
-
-        window.location.replace("../auth/auth_index.html");
+        console.error("Erro ao iniciar NexusPM:", error);
+        showToast(`Erro ao carregar o sistema: ${error.message}`);
     }
 }
 
-// EXPANDIR E RECOLHER A BARRA LATERAL
+// MENU LATERAL
 toggleSidebar.addEventListener("click", () => {
-    const collapsed = sidebar.classList.toggle("collapsed");
+    const recolhida = sidebar.classList.toggle("collapsed");
+    sidebar.classList.toggle("expanded", !recolhida);
 
-    sidebar.classList.toggle("expanded", !collapsed);
-
-    toggleSidebar.innerHTML = collapsed
+    toggleSidebar.innerHTML = recolhida
         ? '<i class="fa-solid fa-bars"></i>'
         : '<i class="fa-solid fa-angles-left"></i>';
 
     toggleSidebar.setAttribute(
         "aria-label",
-        collapsed ? "Expandir menu" : "Recolher menu"
+        recolhida ? "Expandir menu" : "Recolher menu"
     );
 });
 
-// ALTERNAR ENTRE A MATRIZ RACIS E O CRONOGRAMA GANTT
-document.querySelectorAll("[data-view]").forEach(button => {
-    button.addEventListener("click", () => {
+// ALTERNAR ENTRE RACIS E GANTT
+document.querySelectorAll("[data-view]").forEach(botao => {
+    botao.addEventListener("click", () => {
         document.querySelectorAll("[data-view]").forEach(item => {
-            item.classList.toggle("active", item === button);
+            const ativo = item === botao;
+            item.classList.toggle("active", ativo);
 
-            if (item === button) {
-                item.setAttribute("aria-current", "page");
-            } else {
-                item.removeAttribute("aria-current");
-            }
+            if (ativo) item.setAttribute("aria-current", "page");
+            else item.removeAttribute("aria-current");
         });
 
         document.querySelectorAll(".view").forEach(view => {
             view.classList.toggle(
                 "active",
-                view.id === `view-${button.dataset.view}`
+                view.id === `view-${botao.dataset.view}`
             );
         });
     });
 });
 
-// AÇÕES DEMONSTRATIVAS E ENCERRAMENTO DE SESSÃO
-document.querySelectorAll("[data-demo-action]").forEach(button => {
-    const acao = button.dataset.demoAction;
+// AÇÕES DA INTERFACE
+document.querySelectorAll("[data-demo-action]").forEach(botao => {
+    const acao = botao.dataset.demoAction;
 
     if (acao === "sair") {
-        button.addEventListener("click", async () => {
-            button.disabled = true;
-
+        botao.addEventListener("click", async () => {
             try {
                 const { error } = await supabaseClient.auth.signOut();
                 if (error) throw error;
 
                 window.location.replace("../auth/auth_index.html");
             } catch (error) {
-                console.error("Erro ao sair da conta:", error);
-                showToast("Não foi possível sair da conta. Tente novamente.");
-                button.disabled = false;
+                showToast(`Erro ao sair: ${error.message}`);
             }
         });
-        return;
-    } 
-
-    if (acao === "nova-matriz") {
-        button.addEventListener("click", async () => {
-            const nome = prompt("Qual será o nome da nova matriz?");
-
+    } else if (acao === "nova-matriz") {
+        botao.addEventListener("click", async () => {
+            const nome = prompt("Nome da nova matriz:");
             if (nome === null) return;
-
             if (!nome.trim()) {
-                showToast("Informe um nome para a matriz.");
+                showToast("Informe o nome da matriz.");
                 return;
             }
 
-            button.disabled = true;
+            botao.disabled = true;
 
             try {
-                const novaMatriz = await requisicaoApi("/matrizes/", {
+                const nova = await requisicaoApi("/matrizes/", {
                     method: "POST",
-                    body: JSON.stringify({
-                        nome: nome.trim()
-                    })
+                    body: JSON.stringify({ nome: nome.trim() })
                 });
 
-                await carregarMatrizes(novaMatriz.id);
-                showToast("Matriz criada com sucesso!");
+                await carregarMatrizes(nova.id);
+                showToast("Matriz criada.");
             } catch (error) {
-                console.error("Erro ao criar matriz:", error);
-                showToast(`Não foi possível criar a matriz: ${error.message}`);
+                showToast(`Erro ao criar matriz: ${error.message}`);
             } finally {
-                button.disabled = false;
+                botao.disabled = false;
             }
         });
-        return;
+    } else if (acao === "adicionar-tarefa") {
+        botao.addEventListener("click", adicionarTarefa);
+    } else if (acao === "adicionar-membro") {
+        botao.addEventListener("click", adicionarMembro);
+    } else {
+        botao.addEventListener("click", () => {
+            showToast("Esta função será implementada na próxima etapa.");
+        });
     }
-
-    // Demais ações demonstrativas
-    button.addEventListener("click", () => {
-        showToast("Esta ação será conectada ao backend nas próximas etapas.");
-    });
 });
 
-// CONVITES
 document.getElementById("inviteButton").addEventListener("click", () => {
-    showToast("O convite será implementado com a API da equipe.");
+    showToast("Convites serão implementados em uma próxima etapa.");
 });
 
-// LISTA DE INTEGRANTES
-// O elemento pode ainda não existir no HTML.
-document.getElementById("membersButton")?.addEventListener("click", () => {
-    showToast("Aqui será exibida a lista real de integrantes.");
-});
-
-// SELETOR DE EQUIPE
 document.getElementById("teamButton").addEventListener("click", () => {
-    showToast(
-        "Seletor de equipe — disponível quando o backend estiver integrado."
-    );
+    showToast("A seleção de equipe será implementada posteriormente.");
 });
 
-// EXECUTAR A VERIFICAÇÃO DA SESSÃO
 verificarSessao();
