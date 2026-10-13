@@ -42,3 +42,65 @@ h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.2px; }
 .legend-dot { width: 18px; height: 18px; border-radius: 6px; font-size: 9px; font-style: normal; }
 .demo-note { display: inline-flex; align-items: center; gap: 6px; color: #777c89; font-size: 9px; white-space: nowrap; }
 .demo-note i { color: #8e95a4; }
+
+
+/* EDIÇÃO E EXCLUSÃO DOS ITENS RACIS */
+.raci-task-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 180px;
+}
+
+.raci-editable-name,
+.member-name {
+    cursor: text;
+    border-radius: 4px;
+}
+
+.raci-editable-name:hover,
+.member-name:hover {
+    text-decoration: underline dotted;
+    text-underline-offset: 4px;
+}
+
+.raci-inline-edit {
+    width: 100%;
+    min-width: 70px;
+    padding: 5px 7px;
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    outline: none;
+    background: var(--surface-raised);
+    color: var(--text);
+}
+
+.raci-delete-button {
+    display: inline-grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    flex: 0 0 27px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: #d98282;
+    cursor: pointer;
+    opacity: 0.65;
+}
+
+.raci-delete-button:hover {
+    border-color: #633a3a;
+    background: #392426;
+    opacity: 1;
+}
+
+.member-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.member-name {
+    overflow-wrap: anywhere;
+}
