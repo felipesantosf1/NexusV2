@@ -126,11 +126,7 @@
 
                             <div class="menu-divider"></div>
 
-                            <button
-                                type="button"
-                                class="menu-item-matriz danger not-close"
-                                data-action="delete"
-                            >
+                            <button type="button" class="menu-item-matriz danger not-close" data-action="delete">
                                 <i class="fa-solid fa-trash"></i>
                                 <span>Excluir matriz</span>
                             </button>
@@ -158,7 +154,12 @@
                         </tbody>
                     </table>
                     
-                    <div id="menu-raci" class="menu-raci " role="group" aria-label="Selecionar responsabilidade da tarefa">
+                    <div
+                        id="menu-raci"
+                        class="menu-raci hidden"
+                        role="group"
+                        aria-label="Selecionar responsabilidade da tarefa"
+                    >
                         <button
                             type="button"
                             class="legend-dot btn-r role-r"
@@ -286,8 +287,9 @@
 
     </main>
 
-    <!-- BIBLIOTECA -->
+    <!-- BIBLIOTECAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <!-- SUPABASE -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
