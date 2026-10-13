@@ -28,6 +28,7 @@ h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.2px; }
 .member-head > span:last-child { display: flex; flex-direction: column; gap: 4px; }
 .member-head small { color: #7f8491; font-size: 9px; font-weight: 400; }
 .task-index { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 10px; border: 1px solid #343640; border-radius: 7px; color: #848997; font-size: 9px; font-weight: 600; }
+
 .role-badge, .legend-dot { display: inline-grid; place-items: center; width: 27px; height: 27px; border: 1px solid transparent; border-radius: 9px; font-size: 11px; font-weight: 750; }
 .role-none { border-color: #4a4a4a; background: #2e2e2e; color: #d0d0d0; cursor: pointer;}
 .role-none:hover { border-color: #5c5c5c; background: #3a3a3a; color: #ffffff;}
@@ -36,6 +37,14 @@ h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.2px; }
 .role-c { border-color: #5d4b77; background: #392d4c; color: #c8a9ff; }
 .role-i { border-color: #5e5536; background: #3a3624; color: #f0d886; }
 .role-s { border-color: #345b4c; background: #203c31; color: #87dfb2; }
+.menu-raci { position: absolute; background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 6px; display: flex; gap: 4px;}
+.menu-raci button { cursor: pointer; }
+.btn-r:hover { border-color: #8a5f5f; background: #5c3b3b; color: #ffb8b8; }
+.btn-a:hover { border-color: #4f6da3; background: #345080; color: #b8d4ff; }
+.btn-c:hover { border-color: #7e66a3; background: #4d3d6b; color: #dcc4ff; }
+.btn-i:hover { border-color: #857a4d; background: #514c33; color: #ffe9a3; }
+.btn-s:hover { border-color: #478066; background: #2c5445; color: #a3f0c7; }
+
 .panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 17px; border-top: 1px solid var(--border-soft); background: #1b1c20; }
 .raci-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; }
 .raci-legend > span { display: inline-flex; align-items: center; gap: 6px; color: #a4a7b1; font-size: 10px; }
@@ -45,62 +54,11 @@ h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.2px; }
 
 
 /* EDIÇÃO E EXCLUSÃO DOS ITENS RACIS */
-.raci-task-name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 180px;
-}
-
-.raci-editable-name,
-.member-name {
-    cursor: text;
-    border-radius: 4px;
-}
-
-.raci-editable-name:hover,
-.member-name:hover {
-    text-decoration: underline dotted;
-    text-underline-offset: 4px;
-}
-
-.raci-inline-edit {
-    width: 100%;
-    min-width: 70px;
-    padding: 5px 7px;
-    border: 1px solid var(--blue);
-    border-radius: 6px;
-    outline: none;
-    background: var(--surface-raised);
-    color: var(--text);
-}
-
-.raci-delete-button {
-    display: inline-grid;
-    place-items: center;
-    width: 27px;
-    height: 27px;
-    flex: 0 0 27px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: #d98282;
-    cursor: pointer;
-    opacity: 0.65;
-}
-
-.raci-delete-button:hover {
-    border-color: #633a3a;
-    background: #392426;
-    opacity: 1;
-}
-
-.member-head {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-}
-
-.member-name {
-    overflow-wrap: anywhere;
-}
+.raci-task-name { display: flex; align-items: center; gap: 8px; min-width: 180px; }
+.raci-editable-name, .member-name { cursor: text; border-radius: 4px; }
+.raci-editable-name:hover, .member-name:hover { text-decoration: underline dotted; text-underline-offset: 4px;}
+.raci-inline-edit { width: 100%; min-width: 70px; padding: 5px 7px; border: 1px solid var(--blue); border-radius: 6px; outline: none; background: var(--surface-raised); color: var(--text);}
+.raci-delete-button { display: inline-grid;place-items: center; width: 27px; height: 27px; flex: 0 0 27px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #d98282; cursor: pointer;opacity: 0.65;}
+.raci-delete-button:hover { border-color: #633a3a; background: #392426; opacity: 1; }
+.member-head { display: inline-flex; align-items: center; gap: 7px;}
+.member-name { overflow-wrap: anywhere; }

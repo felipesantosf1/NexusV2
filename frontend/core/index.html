@@ -79,11 +79,65 @@
                     <div class="breadcrumb"><span>Equipe do projeto</span><i class="fa-solid fa-chevron-right"></i><span>Planejamento</span></div>
                     <div class="title-line"><div class="page-title-icon raci-title-icon"><i class="fa-solid fa-table-cells-large"></i></div><div><h1>Matriz RACIS</h1><p>Organize as responsabilidades e mantenha todos alinhados.</p></div></div>
                 </div>
+                
                 <div class="page-actions">
-                    <button class="button secondary-button" data-demo-action="exportar"><i class="fa-solid fa-file-export"></i> Exportar</button>
-                    <button class="button primary-button" data-demo-action="nova-matriz"><i class="fa-solid fa-plus"></i> Nova matriz</button>
-                    <button class="icon-button bordered-button" aria-label="Mais ações" title="Mais ações" data-demo-action="mais"><i class="fa-solid fa-ellipsis"></i></button>
+                    <button class="button secondary-button" data-demo-action="exportar">
+                        <i class="fa-solid fa-file-export"></i> Exportar
+                    </button>
+
+                    <button class="button primary-button" data-demo-action="nova-matriz">
+                        <i class="fa-solid fa-plus"></i> Nova matriz
+                    </button>
+
+                    <!-- Botão e menu de ações da matriz -->
+                    <div class="menu-actions-wrapper">
+                        <button type="button" id="btn-menu-matriz" class="icon-button bordered-button" aria-label="Mais ações da matriz" title="Mais ações" aria-haspopup="true" aria-expanded="false" aria-controls="menu-matriz">
+                            <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                        </button>
+
+                        <div id="menu-matriz" class="menu-matriz hidden" data-has-cronograma="false" role="group" aria-label="Ações da matriz">
+                            <button
+                                type="button"
+                                class="menu-item-matriz"
+                                data-action="vincular"
+                                data-target="matriz"
+                            >
+                                <i class="fa-solid fa-link"></i>
+                                <span>Vincular gráfico de Gantt</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="menu-item-matriz"
+                                data-action="gerar-excel"
+                            >
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Exportar para Excel</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="menu-item-matriz not-close"
+                                data-action="open-cronograma"
+                            >
+                                <i class="fa-solid fa-calendar-days"></i>
+                                <span>Abrir cronograma</span>
+                            </button>
+
+                            <div class="menu-divider"></div>
+
+                            <button
+                                type="button"
+                                class="menu-item-matriz danger not-close"
+                                data-action="delete"
+                            >
+                                <i class="fa-solid fa-trash"></i>
+                                <span>Excluir matriz</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
             </div>
 
             <div class="content-panel raci-panel">
@@ -103,6 +157,57 @@
                             <tr><th scope="row"><span class="task-index">01</span>Tarefa Padrão</th><td><span class="role-badge role-none" title="Sem Atribuição"><i class="fa-solid fa-plus"></i></span></td></tr>
                         </tbody>
                     </table>
+                    
+                    <div id="menu-raci" class="menu-raci " role="group" aria-label="Selecionar responsabilidade da tarefa">
+                        <button
+                            type="button"
+                            class="legend-dot btn-r role-r"
+                            data-valor="R"
+                            aria-label="Responsável"
+                            title="Responsável"
+                        >R</button>
+
+                        <button
+                            type="button"
+                            class="legend-dot btn-a role-a"
+                            data-valor="A"
+                            aria-label="Aprovador"
+                            title="Aprovador"
+                        >A</button>
+
+                        <button
+                            type="button"
+                            class="legend-dot btn-c role-c"
+                            data-valor="C"
+                            aria-label="Consultado"
+                            title="Consultado"
+                        >C</button>
+
+                        <button
+                            type="button"
+                            class="legend-dot btn-i role-i"
+                            data-valor="I"
+                            aria-label="Informado"
+                            title="Informado"
+                        >I</button>
+
+                        <button
+                            type="button"
+                            class="legend-dot btn-s role-s"
+                            data-valor="S"
+                            aria-label="Suporte"
+                            title="Suporte"
+                        >S</button>
+
+                        <button
+                            type="button"
+                            class="legend-dot btn-none role-none"
+                            data-valor="-"
+                            aria-label="Remover atribuição"
+                            title="Sem atribuição"
+                        >−</button>
+                    </div>
+
                 </div>
                 <div class="panel-footer"><div class="raci-legend"><span><b class="legend-dot role-r">R</b> Responsável</span><span><b class="legend-dot role-a">A</b> Aprovador</span><span><b class="legend-dot role-c">C</b> Consultado</span><span><b class="legend-dot role-i">I</b> Informado</span><span><b class="legend-dot role-s">S</b> Suporte</span></div><span class="demo-note"><i class="fa-solid fa-circle-info"></i> Dados ilustrativos para visualização</span></div>
             </div>

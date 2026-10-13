@@ -112,12 +112,107 @@ body:has(.sidebar.collapsed) .app-shell { margin-left: 74px; }
 .gantt-title-icon { background: #204033; color: #7bd9ab; }
 h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; }
 .page-heading p { margin: 0; color: var(--text-secondary); font-size: 11px; }
-.page-actions { display: flex; align-items: center; gap: 8px; }
+.page-actions { display: flex; align-items: center; gap: 8px; position: relative;}
 .primary-button { background: var(--blue); color: #fff; box-shadow: 0 3px 10px #2563eb22; }
 .primary-button:hover { background: var(--blue-hover); }
 .secondary-button { border-color: #393b45; background: #202126; color: #d4d6dd; }
 .secondary-button:hover, .bordered-button:hover { border-color: #4a4e5c; background: #292b32; }
 .bordered-button { border-color: #393b45; background: #202126; }
+
+/* .menu-matriz { position: absolute; background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px;}
+.menu-item-matriz { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: transparent; border: none; color: #e5e7eb; font-size: 13px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;}
+.menu-item-matriz:hover { background: #262626; }
+.menu-item-matriz.danger { color: #ff6b6b;}
+.menu-item-matriz.danger:hover { background: rgba(239, 68, 68, 0.15); } */
+
+/* MENU DE AÇÕES DA MATRIZ */
+.menu-actions-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.menu-matriz {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    z-index: 1000;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    width: max-content;
+    min-width: 255px;
+    max-width: min(320px, calc(100vw - 24px));
+    box-sizing: border-box;
+
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+
+    background: var(--surface-raised);
+    box-shadow: 0 12px 30px #0006;
+}
+
+/* Impede que o CSS de exibição do menu ignore a classe hidden */
+.menu-matriz.hidden {
+    display: none;
+}
+
+.menu-item-matriz {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+
+    width: 100%;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.menu-item-matriz i {
+    width: 18px;
+    flex: 0 0 18px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.menu-item-matriz:hover {
+    background: var(--surface-hover);
+}
+
+.menu-item-matriz.danger {
+    color: #ff8585;
+}
+
+.menu-item-matriz.danger i {
+    color: #ff8585;
+}
+
+.menu-item-matriz.danger:hover {
+    background: #392426;
+}
+
+.menu-divider {
+    height: 1px;
+    margin: 4px 2px;
+    background: var(--border);
+}
+
 
 /* FOOTER */
 .app-footer { display: flex; justify-content: space-between; gap: 12px; padding: 22px 2px 4px; color: #5e626e; font-size: 9px; }
