@@ -1,3 +1,4 @@
+renderizarRaci
 
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
@@ -11,6 +12,17 @@ const tituloMatriz = document.querySelector(
 const tabelaRaci = document.querySelector(".raci-table");
 const cabecalhoRaci = tabelaRaci.querySelector("thead");
 const corpoRaci = tabelaRaci.querySelector("tbody");
+
+const botaoMenuMatriz = document.getElementById("btn-menu-matriz");
+const menuMatriz = document.getElementById("menu-matriz");
+const wrapperMenuMatriz = document.querySelector(".menu-actions-wrapper");
+const menuRaci = document.getElementById("menu-raci");
+
+let atribuicaoAlvoRaci = null;
+let cronogramasUsuario = [];
+
+// O seletor ficará fora da tabela para não ser cortado pelo scroll.
+document.body.appendChild(menuRaci);
 
 let toastTimer;
 let matrizAtualId = null;
@@ -125,6 +137,7 @@ async function carregarDadosRaci(matrizId) {
     }
 
     renderizarRaci();
+    await atualizarEstadoMenuMatriz();
 }
 
 // EDIÇÃO DE TEXTO COM DUPLO CLIQUE
@@ -263,24 +276,72 @@ async function excluirMembro(membro) {
     }
 }
 
+
+
+
+
+
 // DEFINIR OU REMOVER UM PAPEL RACIS
-async function editarAtribuicao(tarefa, membro) {
+
+function fecharMenuRaci() {
+    menuRaci.classList.add("hidden");
+    atribuicaoAlvoRaci = null;
+}
+
+function abrirMenuRaci(event, tarefa, membro) {
+    event.stopPropagation();
+    atribuicaoAlvoRaci = { tarefa, membro };
+
     const atual = dadosRaci.atribuicoes.find(item =>
         item.tarefa_id === tarefa.id &&
         item.membro_id === membro.id
     );
 
-    const resposta = prompt(
-        "Digite R, A, C, I ou S. Deixe vazio para remover o papel.",
-        atual?.papel || ""
+    // Destaca o papel que já está salvo.
+    menuRaci.querySelectorAll("[data-valor]").forEach(botao => {
+        botao.classList.toggle(
+            "papel-selecionado",
+            botao.dataset.valor === (atual?.papel || "-")
+        );
+    });
+
+    menuRaci.classList.remove("hidden");
+
+    // Posiciona o seletor próximo à célula clicada.
+    const rect = event.currentTarget.getBoundingClientRect();
+    const largura = menuRaci.offsetWidth;
+    const altura = menuRaci.offsetHeight;
+
+    let esquerda = rect.left + rect.width / 2 - largura / 2;
+    esquerda = Math.max(
+        8,
+        Math.min(esquerda, window.innerWidth - largura - 8)
     );
 
-    if (resposta === null) return;
+    let topo = rect.bottom + 7;
 
-    const papel = resposta.trim().toUpperCase();
+    if (topo + altura > window.innerHeight - 8) {
+        topo = rect.top - altura - 7;
+    }
+
+    menuRaci.style.left = `${esquerda}px`;
+    menuRaci.style.top = `${Math.max(8, topo)}px`;
+}
+
+async function salvarPapelRaci(papel) {
+    if (!atribuicaoAlvoRaci) return;
+
+    const { tarefa, membro } = atribuicaoAlvoRaci;
+
+    const atual = dadosRaci.atribuicoes.find(item =>
+        item.tarefa_id === tarefa.id &&
+        item.membro_id === membro.id
+    );
+
+    fecharMenuRaci();
 
     try {
-        if (!papel) {
+        if (papel === "-") {
             if (!atual) return;
 
             await requisicaoApi(
@@ -288,11 +349,6 @@ async function editarAtribuicao(tarefa, membro) {
                 { method: "DELETE" }
             );
         } else {
-            if (!papeisRaci.includes(papel)) {
-                showToast("Use apenas R, A, C, I ou S.");
-                return;
-            }
-
             await requisicaoApi(
                 `/matrizes/${matrizAtualId}/atribuicoes`,
                 {
@@ -311,6 +367,15 @@ async function editarAtribuicao(tarefa, membro) {
         showToast(`Não foi possível salvar o papel: ${error.message}`);
     }
 }
+
+
+
+
+
+
+
+
+
 
 // MONTAR A TABELA RACIS COM DADOS REAIS
 function renderizarRaci() {
@@ -433,8 +498,8 @@ function renderizarRaci() {
                     '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
             }
 
-            botaoPapel.addEventListener("click", () => {
-                editarAtribuicao(tarefa, membro);
+            botaoPapel.addEventListener("click", event => {
+                abrirMenuRaci(event, tarefa, membro);
             });
 
             celula.appendChild(botaoPapel);
@@ -569,6 +634,47 @@ async function verificarSessao() {
     }
 }
 
+async function atualizarEstadoMenuMatriz() {
+    cronogramasUsuario = await requisicaoApi("/cronogramas/");
+
+    const vinculado = cronogramasUsuario.find(
+        cronograma => cronograma.matriz_id === matrizAtualId
+    );
+
+    menuMatriz.dataset.hasCronograma = vinculado ? "true" : "false";
+
+    const botaoVincular = menuMatriz.querySelector(
+        '[data-action="vincular"]'
+    );
+
+    botaoVincular.querySelector("span").textContent = vinculado
+        ? "Desvincular gráfico de Gantt"
+        : "Vincular gráfico de Gantt";
+
+    menuMatriz.querySelector(
+        '[data-action="open-cronograma"]'
+    ).hidden = !vinculado;
+
+    const seletorGantt = document.getElementById("ganttSelect");
+    seletorGantt.replaceChildren();
+
+    cronogramasUsuario.forEach(cronograma => {
+        const opcao = document.createElement("option");
+        opcao.value = cronograma.id;
+        opcao.textContent = cronograma.nome;
+        seletorGantt.appendChild(opcao);
+    });
+
+    if (vinculado) {
+        seletorGantt.value = vinculado.id;
+    }
+}
+
+function fecharMenuMatriz() {
+    menuMatriz.classList.add("hidden");
+    botaoMenuMatriz.setAttribute("aria-expanded", "false");
+}
+
 // MENU LATERAL
 toggleSidebar.addEventListener("click", () => {
     const recolhida = sidebar.classList.toggle("collapsed");
@@ -583,6 +689,174 @@ toggleSidebar.addEventListener("click", () => {
         recolhida ? "Expandir menu" : "Recolher menu"
     );
 });
+
+
+async function exportarMatrizExcel() {
+    if (!window.XLSX) {
+        throw new Error("A biblioteca Excel não foi carregada.");
+    }
+
+    const linhas = [
+        [
+            "Tarefa / Atividade",
+            ...dadosRaci.membros.map(membro => membro.nome)
+        ]
+    ];
+
+    dadosRaci.tarefas.forEach(tarefa => {
+        const linha = [tarefa.nome];
+
+        dadosRaci.membros.forEach(membro => {
+            const atribuicao = dadosRaci.atribuicoes.find(item =>
+                item.tarefa_id === tarefa.id &&
+                item.membro_id === membro.id
+            );
+
+            linha.push(atribuicao?.papel || "-");
+        });
+
+        linhas.push(linha);
+    });
+
+    const planilha = XLSX.utils.aoa_to_sheet(linhas);
+    const livro = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(livro, planilha, "Matriz RACIS");
+
+    const nomeArquivo = (tituloMatriz.textContent.trim() || "Matriz")
+        .replace(/[\\/:*?"<>|]/g, "_");
+
+    XLSX.writeFile(livro, `${nomeArquivo}.xlsx`);
+}
+
+async function excluirMatrizAtual() {
+    const nome = seletorMatriz.selectedOptions[0]?.textContent || "esta matriz";
+
+    if (!confirm(`Tem certeza de que deseja excluir "${nome}"? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+
+    try {
+        await requisicaoApi(`/matrizes/${matrizAtualId}`, {
+            method: "DELETE"
+        });
+
+        await carregarMatrizes();
+        await atualizarEstadoMenuMatriz();
+
+        showToast("Matriz excluída.");
+    } catch (error) {
+        showToast(`Não foi possível excluir: ${error.message}`);
+    }
+}
+
+async function vincularMatrizAGantt() {
+    await atualizarEstadoMenuMatriz();
+
+    const vinculado = cronogramasUsuario.find(
+        cronograma => cronograma.matriz_id === matrizAtualId
+    );
+
+    if (vinculado) {
+        if (!confirm(`Desvincular "${vinculado.nome}" desta matriz? O cronograma será mantido.`)) {
+            return;
+        }
+
+        await requisicaoApi(
+            `/cronogramas/${vinculado.id}/vinculo`,
+            {
+                method: "PUT",
+                body: JSON.stringify({ matriz_id: null })
+            }
+        );
+
+        await atualizarEstadoMenuMatriz();
+        showToast("Cronograma desvinculado. Os dados foram mantidos.");
+        return;
+    }
+
+    const disponiveis = cronogramasUsuario.filter(
+        cronograma => !cronograma.matriz_id
+    );
+
+    let cronograma;
+
+    if (disponiveis.length > 0) {
+        const lista = disponiveis
+            .map((item, indice) => `${indice + 1}. ${item.nome}`)
+            .join("\n");
+
+        const resposta = prompt(
+            `Escolha o cronograma para vincular:\n\n${lista}\n\nDigite o número desejado.`,
+            "1"
+        );
+
+        if (resposta === null) return;
+
+        const indice = Number(resposta) - 1;
+
+        if (!Number.isInteger(indice) || !disponiveis[indice]) {
+            showToast("Seleção de cronograma inválida.");
+            return;
+        }
+
+        cronograma = disponiveis[indice];
+    } else {
+        const nome = prompt(
+            "Não há cronogramas independentes disponíveis. Nome do novo cronograma:",
+            `${tituloMatriz.textContent} - Cronograma`
+        );
+
+        if (nome === null) return;
+
+        if (!nome.trim()) {
+            showToast("Informe um nome para o cronograma.");
+            return;
+        }
+
+        cronograma = await requisicaoApi("/cronogramas/", {
+            method: "POST",
+            body: JSON.stringify({ nome: nome.trim() })
+        });
+    }
+
+    await requisicaoApi(
+        `/cronogramas/${cronograma.id}/vinculo`,
+        {
+            method: "PUT",
+            body: JSON.stringify({ matriz_id: matrizAtualId })
+        }
+    );
+
+    await atualizarEstadoMenuMatriz();
+    showToast("Matriz vinculada ao gráfico de Gantt.");
+}
+
+async function abrirCronogramaVinculado() {
+    await atualizarEstadoMenuMatriz();
+
+    const cronograma = cronogramasUsuario.find(
+        item => item.matriz_id === matrizAtualId
+    );
+
+    if (!cronograma) {
+        showToast("Esta matriz não possui um cronograma vinculado.");
+        return;
+    }
+
+    document.getElementById("ganttSelect").value = cronograma.id;
+
+    const tituloGantt = document.querySelector(
+        "#view-gantt .gantt-panel .matrix-title-row h2"
+    );
+
+    if (tituloGantt) {
+        tituloGantt.textContent = cronograma.nome;
+    }
+
+    document.querySelector('[data-view="gantt"]').click();
+}
+
 
 // ALTERNAR ENTRE RACIS E GANTT
 document.querySelectorAll("[data-view]").forEach(botao => {
@@ -662,5 +936,70 @@ document.getElementById("inviteButton").addEventListener("click", () => {
 document.getElementById("teamButton").addEventListener("click", () => {
     showToast("A seleção de equipe será implementada posteriormente.");
 });
+
+botaoMenuMatriz.addEventListener("click", event => {
+    event.stopPropagation();
+
+    const vaiAbrir = menuMatriz.classList.contains("hidden");
+
+    menuMatriz.classList.toggle("hidden", !vaiAbrir);
+    botaoMenuMatriz.setAttribute("aria-expanded", String(vaiAbrir));
+});
+
+document.addEventListener("click", event => {
+    if (!wrapperMenuMatriz.contains(event.target)) {
+        fecharMenuMatriz();
+    }
+});
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+        fecharMenuMatriz();
+        fecharMenuRaci();
+    }
+});
+
+menuMatriz.querySelectorAll("[data-action]").forEach(botao => {
+    botao.addEventListener("click", async () => {
+        const acao = botao.dataset.action;
+
+        fecharMenuMatriz();
+
+        try {
+            if (acao === "vincular") {
+                await vincularMatrizAGantt();
+            } else if (acao === "gerar-excel") {
+                await exportarMatrizExcel();
+            } else if (acao === "open-cronograma") {
+                await abrirCronogramaVinculado();
+            } else if (acao === "delete") {
+                await excluirMatrizAtual();
+            }
+        } catch (error) {
+            console.error("Erro no menu da matriz:", error);
+            showToast(`Não foi possível executar a ação: ${error.message}`);
+        }
+    });
+});
+
+// Cada botão do menu salva o papel escolhido.
+menuRaci.querySelectorAll("[data-valor]").forEach(botao => {
+    botao.addEventListener("click", event => {
+        event.stopPropagation();
+        salvarPapelRaci(botao.dataset.valor);
+    });
+});
+
+// Clicar fora fecha o seletor.
+document.addEventListener("click", event => {
+    if (
+        !menuRaci.classList.contains("hidden") &&
+        !menuRaci.contains(event.target) &&
+        !event.target.closest(".role-badge")
+    ) {
+        fecharMenuRaci();
+    }
+});
+
 
 verificarSessao();
