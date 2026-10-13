@@ -217,7 +217,64 @@
         <section class="view" id="view-gantt">
             <div class="page-heading">
                 <div><div class="breadcrumb"><span>Equipe do projeto</span><i class="fa-solid fa-chevron-right"></i><span>Planejamento</span></div><div class="title-line"><div class="page-title-icon gantt-title-icon"><i class="fa-solid fa-calendar-days"></i></div><div><h1>Cronograma Gantt</h1><p>Visualize prazos, acompanhe o andamento e coordene entregas.</p></div></div></div>
-                <div class="page-actions"><button class="button secondary-button" data-demo-action="exportar"><i class="fa-solid fa-file-export"></i> Exportar</button><button class="button primary-button" data-demo-action="nova-tarefa"><i class="fa-solid fa-plus"></i> Nova tarefa</button><button class="icon-button bordered-button" aria-label="Mais ações" data-demo-action="mais"><i class="fa-solid fa-ellipsis"></i></button></div>
+                <div class="page-actions">
+                    <button class="button secondary-button" data-demo-action="exportar">
+                        <i class="fa-solid fa-file-export"></i> Exportar
+                    </button>
+                    <button class="button primary-button" data-demo-action="novo-grafico">
+                        <i class="fa-solid fa-plus"></i> Nova Grafico
+                    </button>
+                    <button class="button primary-button" data-demo-action="nova-tarefa">
+                        <i class="fa-solid fa-plus"></i> Nova tarefa
+                    </button>
+                    <button class="icon-button bordered-button" aria-label="Mais ações" data-demo-action="mais">
+                        <i class="fa-solid fa-ellipsis"></i>
+                    </button>
+
+                    <!-- Botão e menu de ações da grafico -->
+                    <div class="menu-actions-wrapper">
+                        <button type="button" id="btn-menu-grafico" class="icon-button bordered-button" aria-label="Mais ações do grafico" title="Mais ações" aria-haspopup="true" aria-expanded="false" aria-controls="menu-grafico">
+                            <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                        </button>
+
+                        <div id="menu-grafico" class="menu-grafico hidden" data-has-cronograma="false" role="group" aria-label="Ações do grafico">
+                            <button
+                                type="button"
+                                class="menu-item-grafico"
+                                data-action="vincular"
+                                data-target="grafico"
+                            >
+                                <i class="fa-solid fa-link"></i>
+                                <span>Vincular Matriz Raci</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="menu-item-grafico"
+                                data-action="gerar-excel"
+                            >
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Exportar para Excel</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="menu-item-grafico not-close"
+                                data-action="open-cronograma"
+                            >
+                                <i class="fa-solid fa-calendar-days"></i>
+                                <span>Abrir cronograma</span>
+                            </button>
+
+                            <div class="menu-divider"></div>
+
+                            <button type="button" class="menu-item-matriz danger not-close" data-action="delete">
+                                <i class="fa-solid fa-trash"></i>
+                                <span>Excluir matriz</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="gantt-summary-row">
                 <div class="gantt-context-card">
