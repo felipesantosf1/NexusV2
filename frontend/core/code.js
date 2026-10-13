@@ -426,9 +426,12 @@ function renderizarRaci() {
                 ? `Papel ${atribuicao.papel} — clique para alterar`
                 : "Sem atribuição — clique para definir";
 
-            botaoPapel.textContent = atribuicao
-                ? atribuicao.papel
-                : "+";
+            if (atribuicao) {
+                botaoPapel.textContent = atribuicao.papel;
+            } else {
+                botaoPapel.innerHTML =
+                    '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
+            }
 
             botaoPapel.addEventListener("click", () => {
                 editarAtribuicao(tarefa, membro);

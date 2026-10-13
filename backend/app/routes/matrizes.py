@@ -23,34 +23,41 @@ def listar_matrizes(
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
+    # Busca as matrizes que já existem para o usuário.
     cursor.execute(
         """
-        INSERT INTO matrizes (nome, usuario_id, is_padrao)
-        VALUES (%s, %s, TRUE)
-        RETURNING id, usuario_id, nome, created_at;
+        SELECT id, usuario_id, nome, created_at
+        FROM matrizes
+        WHERE usuario_id = %s
+        ORDER BY created_at ASC;
         """,
-        ["Matriz Padrão", str(usuario["id"])],
+        [str(usuario["id"])],
     )
 
     matrizes = cursor.fetchall()
 
-    # Se o usuário não tiver nenhuma matriz, cria a Matriz Padrão automaticamente
+    # Cria a matriz padrão somente se o usuário ainda não tiver nenhuma.
     if not matrizes:
         cursor.execute(
             """
-            INSERT INTO matrizes (nome, usuario_id)
-            VALUES (%s, %s)
+            INSERT INTO matrizes (nome, usuario_id, is_padrao)
+            VALUES (%s, %s, TRUE)
             RETURNING id, usuario_id, nome, created_at;
             """,
             ["Matriz Padrão", str(usuario["id"])],
         )
+
         nova_matriz = cursor.fetchone()
+
+        # Confirma a gravação no banco.
         dados.commit()
+
         matrizes = [nova_matriz]
 
     cursor.close()
 
     return matrizes
+
 
 
 # Cria uma matriz vinculada ao usuário autenticado
