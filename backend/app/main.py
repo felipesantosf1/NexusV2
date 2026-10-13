@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importa as rotas de matrizes (ajuste o caminho se a sua pasta de rotas tiver outro nome, ex: app.routes.matrizes)
+# Importa as rotas 
 from app.routes.matrizes import router as matrizes_router
+from app.routes.raci import router as raci_router
 
 
 # Cria a aplicação da API do NexusPM
@@ -21,6 +22,7 @@ app.add_middleware(
 
 # Registra as rotas de matrizes no aplicativo principal
 app.include_router(matrizes_router)
+app.include_router(raci_router)
 
 
 # Rota inicial da API
