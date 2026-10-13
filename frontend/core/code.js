@@ -1,3 +1,5 @@
+atualizarEstadoMenuMatriz
+
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
@@ -11,7 +13,12 @@ const corpoRaci = tabelaRaci.querySelector("tbody");
 
 const botaoMenuMatriz = document.getElementById("btn-menu-matriz");
 const menuMatriz = document.getElementById("menu-matriz");
-const wrapperMenuMatriz = document.querySelector(".menu-actions-wrapper");
+const wrapperMenuMatriz = document.querySelector("#view-raci .menu-actions-wrapper");
+
+const botaoMenuGrafico = document.getElementById("btn-menu-grafico");
+const menuGrafico = document.getElementById("menu-grafico");
+const wrapperMenuGrafico = botaoMenuGrafico.closest(".menu-actions-wrapper");
+
 const menuRaci = document.getElementById("menu-raci");
 
 let atribuicaoAlvoRaci = null;
@@ -668,11 +675,12 @@ async function verificarSessao() {
     }
 }
 
+
 async function atualizarEstadoMenuMatriz() {
     cronogramasUsuario = await requisicaoApi("/cronogramas/");
 
     const vinculado = cronogramasUsuario.find(
-        cronograma => cronograma.matriz_id === matrizAtualId
+        cronograma => String(cronograma.matriz_id) === String(matrizAtualId)
     );
 
     menuMatriz.dataset.hasCronograma = vinculado ? "true" : "false";
@@ -702,7 +710,273 @@ async function atualizarEstadoMenuMatriz() {
     if (vinculado) {
         seletorGantt.value = vinculado.id;
     }
+
+    // atualiza as opções do menu do gráfico
+    // conforme o cronograma que ficou selecionado.
+    atualizarEstadoMenuGrafico();
 }
+
+
+
+function atualizarEstadoMenuGrafico() {
+    const seletor = document.getElementById("ganttSelect");
+
+    const grafico = cronogramasUsuario.find(
+        item => String(item.id) === String(seletor.value)
+    );
+
+    menuGrafico.dataset.hasCronograma = grafico ? "true" : "false";
+
+    const botaoVincular = menuGrafico.querySelector(
+        '[data-action="vincular"]'
+    );
+
+    const botaoExcluir = menuGrafico.querySelector(
+        '[data-action="excluir-grafico"]'
+    );
+
+    const botaoAbrir = menuGrafico.querySelector(
+        '[data-action="abrir-matriz"]'
+    );
+
+    botaoVincular.disabled = !grafico;
+    botaoExcluir.disabled = !grafico;
+
+    botaoVincular.querySelector("span").textContent =
+        grafico?.matriz_id
+            ? "Desvincular matriz RACIS"
+            : "Vincular matriz RACIS";
+
+    botaoAbrir.hidden = !grafico?.matriz_id;
+}
+
+async function criarGraficoGantt() {
+    const nome = prompt("Nome do novo gráfico Gantt:");
+
+    if (nome === null) return;
+
+    if (!nome.trim()) {
+        showToast("Informe um nome para o gráfico.");
+        return;
+    }
+
+    try {
+        const novoGrafico = await requisicaoApi("/cronogramas/", {
+            method: "POST",
+            body: JSON.stringify({ nome: nome.trim() })
+        });
+
+        await atualizarEstadoMenuMatriz(novoGrafico.id);
+        await renderizarGanttVinculado();
+
+        document.querySelector('[data-view="gantt"]').click();
+        showToast("Gráfico criado.");
+    } catch (error) {
+        showToast(`Não foi possível criar o gráfico: ${error.message}`);
+    }
+}
+
+async function excluirGraficoAtual() {
+    const seletor = document.getElementById("ganttSelect");
+
+    const grafico = cronogramasUsuario.find(
+        item => String(item.id) === String(seletor.value)
+    );
+
+    if (!grafico) {
+        showToast("Selecione um gráfico para excluir.");
+        return;
+    }
+
+    if (!confirm(
+        `Excluir o gráfico "${grafico.nome}"? A matriz e suas tarefas serão mantidas.`
+    )) {
+        return;
+    }
+
+    try {
+        await requisicaoApi(`/cronogramas/${grafico.id}`, {
+            method: "DELETE"
+        });
+
+        await atualizarEstadoMenuMatriz();
+        await renderizarGanttVinculado();
+
+        showToast("Gráfico excluído. A matriz e suas tarefas foram mantidas.");
+    } catch (error) {
+        showToast(`Não foi possível excluir o gráfico: ${error.message}`);
+    }
+}
+
+async function vincularMatrizAoGraficoAtual() {
+    const seletor = document.getElementById("ganttSelect");
+
+    const grafico = cronogramasUsuario.find(
+        item => String(item.id) === String(seletor.value)
+    );
+
+    if (!grafico) {
+        showToast("Crie ou selecione um gráfico primeiro.");
+        return;
+    }
+
+    try {
+        if (grafico.matriz_id) {
+            if (!confirm(
+                `Desvincular "${grafico.nome}" da matriz? Os dados serão mantidos.`
+            )) {
+                return;
+            }
+
+            await requisicaoApi(
+                `/cronogramas/${grafico.id}/vinculo`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({ matriz_id: null })
+                }
+            );
+
+            await atualizarEstadoMenuMatriz(grafico.id);
+            await renderizarGanttVinculado();
+
+            showToast("Matriz desvinculada.");
+            return;
+        }
+
+        const matrizes = await requisicaoApi("/matrizes/");
+
+        // Impede vincular uma matriz já usada por outro gráfico.
+        const matrizesOcupadas = new Set(
+            cronogramasUsuario
+                .filter(item =>
+                    String(item.id) !== String(grafico.id) &&
+                    item.matriz_id
+                )
+                .map(item => String(item.matriz_id))
+        );
+
+        const disponiveis = matrizes.filter(
+            matriz => !matrizesOcupadas.has(String(matriz.id))
+        );
+
+        if (!disponiveis.length) {
+            showToast("Não há matrizes disponíveis para vincular.");
+            return;
+        }
+
+        const lista = disponiveis
+            .map((matriz, indice) => `${indice + 1}. ${matriz.nome}`)
+            .join("\n");
+
+        const resposta = prompt(
+            `Escolha a matriz para "${grafico.nome}":\n\n${lista}\n\nDigite o número desejado.`,
+            "1"
+        );
+
+        if (resposta === null) return;
+
+        const indice = Number(resposta) - 1;
+
+        if (!Number.isInteger(indice) || !disponiveis[indice]) {
+            showToast("Seleção de matriz inválida.");
+            return;
+        }
+
+        await requisicaoApi(
+            `/cronogramas/${grafico.id}/vinculo`,
+            {
+                method: "PUT",
+                body: JSON.stringify({
+                    matriz_id: disponiveis[indice].id
+                })
+            }
+        );
+
+        await atualizarEstadoMenuMatriz(grafico.id);
+        await renderizarGanttVinculado();
+
+        showToast("Matriz vinculada ao gráfico.");
+    } catch (error) {
+        showToast(`Não foi possível atualizar o vínculo: ${error.message}`);
+    }
+}
+
+async function abrirMatrizVinculada() {
+    const seletor = document.getElementById("ganttSelect");
+
+    const grafico = cronogramasUsuario.find(
+        item => String(item.id) === String(seletor.value)
+    );
+
+    if (!grafico?.matriz_id) {
+        showToast("Este gráfico não possui uma matriz vinculada.");
+        return;
+    }
+
+    try {
+        await carregarMatrizes(grafico.matriz_id);
+        document.querySelector('[data-view="raci"]').click();
+    } catch (error) {
+        showToast(`Não foi possível abrir a matriz: ${error.message}`);
+    }
+}
+
+async function exportarGraficoExcel() {
+    if (!window.XLSX) {
+        throw new Error("A biblioteca Excel não foi carregada.");
+    }
+
+    const seletor = document.getElementById("ganttSelect");
+
+    const grafico = cronogramasUsuario.find(
+        item => String(item.id) === String(seletor.value)
+    );
+
+    if (!grafico) {
+        showToast("Selecione um gráfico para exportar.");
+        return;
+    }
+
+    if (!grafico.matriz_id) {
+        showToast("Vincule uma matriz antes de exportar as tarefas.");
+        return;
+    }
+
+    const raci = String(grafico.matriz_id) === String(matrizAtualId)
+        ? dadosRaci
+        : await requisicaoApi(`/matrizes/${grafico.matriz_id}/raci`);
+
+    const linhas = [[
+        "Tarefa / Atividade",
+        ...(raci.membros || []).map(membro => membro.nome)
+    ]];
+
+    (raci.tarefas || []).forEach(tarefa => {
+        const linha = [tarefa.nome];
+
+        (raci.membros || []).forEach(membro => {
+            const atribuicao = (raci.atribuicoes || []).find(item =>
+                item.tarefa_id === tarefa.id &&
+                item.membro_id === membro.id
+            );
+
+            linha.push(atribuicao?.papel || "-");
+        });
+
+        linhas.push(linha);
+    });
+
+    const planilha = XLSX.utils.aoa_to_sheet(linhas);
+    const livro = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(livro, planilha, "Tarefas do Gantt");
+
+    const nomeArquivo = grafico.nome
+        .replace(/[\\/:*?"<>|]/g, "_");
+
+    XLSX.writeFile(livro, `${nomeArquivo}.xlsx`);
+}
+
 
 async function renderizarGanttVinculado() {
     const versao = ++versaoRenderGantt;
@@ -897,6 +1171,41 @@ function fecharMenuMatriz() {
     botaoMenuMatriz.setAttribute("aria-expanded", "false");
 }
 
+function fecharMenuGrafico() {
+    menuGrafico.classList.add("hidden");
+    botaoMenuGrafico.setAttribute("aria-expanded", "false");
+}
+
+botaoMenuMatriz.addEventListener("click", event => {
+    event.stopPropagation();
+
+    const vaiAbrir = menuMatriz.classList.contains("hidden");
+
+    fecharMenuGrafico();
+    menuMatriz.classList.toggle("hidden", !vaiAbrir);
+    botaoMenuMatriz.setAttribute("aria-expanded", String(vaiAbrir));
+});
+
+botaoMenuGrafico.addEventListener("click", event => {
+    event.stopPropagation();
+
+    const vaiAbrir = menuGrafico.classList.contains("hidden");
+
+    fecharMenuMatriz();
+    menuGrafico.classList.toggle("hidden", !vaiAbrir);
+    botaoMenuGrafico.setAttribute("aria-expanded", String(vaiAbrir));
+});
+
+document.addEventListener("click", event => {
+    if (!wrapperMenuMatriz.contains(event.target)) {
+        fecharMenuMatriz();
+    }
+
+    if (!wrapperMenuGrafico.contains(event.target)) {
+        fecharMenuGrafico();
+    }
+});
+
 // MENU LATERAL
 toggleSidebar.addEventListener("click", () => {
     const recolhida = sidebar.classList.toggle("collapsed");
@@ -971,7 +1280,6 @@ async function excluirMatrizAtual() {
         showToast(`Não foi possível excluir: ${error.message}`);
     }
 }
-
 
 async function vincularMatrizAGantt() {
     await atualizarEstadoMenuMatriz();
@@ -1122,10 +1430,13 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
                 showToast(`Erro ao sair: ${error.message}`);
             }
         });
+
     } else if (acao === "nova-matriz") {
         botao.addEventListener("click", async () => {
             const nome = prompt("Nome da nova matriz:");
+
             if (nome === null) return;
+
             if (!nome.trim()) {
                 showToast("Informe o nome da matriz.");
                 return;
@@ -1147,15 +1458,45 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
                 botao.disabled = false;
             }
         });
+
+    } else if (acao === "novo-grafico") {
+        botao.addEventListener("click", criarGraficoGantt);
+
     } else if (acao === "nova-tarefa") {
         botao.addEventListener("click", adicionarTarefaGantt);
+
     } else if (acao === "adicionar-tarefa") {
         botao.addEventListener("click", adicionarTarefa);
+
     } else if (acao === "adicionar-membro") {
         botao.addEventListener("click", adicionarMembro);
+
+    // ALTERADO: direciona a exportação para a tela ativa.
+    } else if (acao === "exportar") {
+        botao.addEventListener("click", async () => {
+            try {
+                const ganttAtivo = document
+                    .getElementById("view-gantt")
+                    .classList.contains("active");
+
+                if (ganttAtivo) {
+                    await exportarGraficoExcel();
+                } else {
+                    await exportarMatrizExcel();
+                }
+            } catch (error) {
+                console.error("Erro ao exportar:", error);
+                showToast(
+                    `Não foi possível exportar: ${error.message}`
+                );
+            }
+        });
+
     } else {
         botao.addEventListener("click", () => {
-            showToast("Esta função será implementada na próxima etapa.");
+            showToast(
+                "Esta função será implementada na próxima etapa."
+            );
         });
     }
 });
@@ -1186,6 +1527,7 @@ document.addEventListener("click", event => {
 document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
         fecharMenuMatriz();
+        fecharMenuGrafico();
         fecharMenuRaci();
     }
 });
@@ -1208,6 +1550,30 @@ menuMatriz.querySelectorAll("[data-action]").forEach(botao => {
             }
         } catch (error) {
             console.error("Erro no menu da matriz:", error);
+            showToast(`Não foi possível executar a ação: ${error.message}`);
+        }
+    });
+});
+
+menuGrafico.querySelectorAll("[data-action]").forEach(botao => {
+    botao.addEventListener("click", async event => {
+        event.stopPropagation();
+
+        const acao = botao.dataset.action;
+        fecharMenuGrafico();
+
+        try {
+            if (acao === "vincular") {
+                await vincularMatrizAoGraficoAtual();
+            } else if (acao === "gerar-excel") {
+                await exportarGraficoExcel();
+            } else if (acao === "abrir-matriz") {
+                await abrirMatrizVinculada();
+            } else if (acao === "excluir-grafico") {
+                await excluirGraficoAtual();
+            }
+        } catch (error) {
+            console.error("Erro no menu do gráfico:", error);
             showToast(`Não foi possível executar a ação: ${error.message}`);
         }
     });

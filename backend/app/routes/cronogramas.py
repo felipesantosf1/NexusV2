@@ -140,3 +140,31 @@ def atualizar_vinculo(
     dados.commit()
     cursor.close()
     return cronograma
+
+
+@router.delete("/{cronograma_id}", status_code=204)
+def excluir_cronograma(cronograma_id: UUID, dados=Depends(get_db), usuario=Depends(get_current_user)):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute(
+        """
+        DELETE FROM cronogramas
+        WHERE id = %s AND usuario_id = %s
+        RETURNING id;
+        """,
+        [str(cronograma_id), str(usuario["id"])],
+    )
+
+    cronograma_excluido = cursor.fetchone()
+
+    if not cronograma_excluido:
+        cursor.close()
+        raise HTTPException(404, "Gráfico não encontrado.")
+
+    # Exclui apenas o gráfico.
+    # A matriz e as tarefas RACIS permanecem no banco.
+    dados.commit()
+    cursor.close()
+
+    return None
+

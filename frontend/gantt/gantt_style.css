@@ -30,3 +30,86 @@
 .bar-done { background: #277c5c; }
 .bar-progress { background: #315fae; }
 .bar-pending { background: #444751; }
+
+
+/* MENU DE AÇÕES DO GRÁFICO GANTT */
+#view-gantt .menu-actions-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.menu-grafico {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 1000;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    width: max-content;
+    min-width: 255px;
+    max-width: min(320px, calc(100vw - 24px));
+    box-sizing: border-box;
+
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+
+    background: var(--surface-raised);
+    box-shadow: 0 12px 30px #0006;
+}
+
+.menu-grafico.hidden,
+.menu-item-grafico[hidden] {
+    display: none !important;
+}
+
+.menu-item-grafico {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+
+    font-size: 12px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.menu-item-grafico i {
+    width: 18px;
+    flex: 0 0 18px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.menu-item-grafico:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.menu-item-grafico:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.menu-item-grafico.danger,
+.menu-item-grafico.danger i {
+    color: #ff8585;
+}
+
+.menu-item-grafico.danger:hover:not(:disabled) {
+    background: #392426;
+}

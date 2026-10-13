@@ -222,13 +222,10 @@
                         <i class="fa-solid fa-file-export"></i> Exportar
                     </button>
                     <button class="button primary-button" data-demo-action="novo-grafico">
-                        <i class="fa-solid fa-plus"></i> Nova Grafico
+                        <i class="fa-solid fa-plus"></i> Novo gráfico
                     </button>
                     <button class="button primary-button" data-demo-action="nova-tarefa">
                         <i class="fa-solid fa-plus"></i> Nova tarefa
-                    </button>
-                    <button class="icon-button bordered-button" aria-label="Mais ações" data-demo-action="mais">
-                        <i class="fa-solid fa-ellipsis"></i>
                     </button>
 
                     <!-- Botão e menu de ações da grafico -->
@@ -237,42 +234,44 @@
                             <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
                         </button>
 
-                        <div id="menu-grafico" class="menu-grafico hidden" data-has-cronograma="false" role="group" aria-label="Ações do grafico">
-                            <button
-                                type="button"
-                                class="menu-item-grafico"
-                                data-action="vincular"
-                                data-target="grafico"
-                            >
-                                <i class="fa-solid fa-link"></i>
-                                <span>Vincular Matriz Raci</span>
+                        <div id="menu-grafico"
+                            class="menu-grafico hidden"
+                            data-has-cronograma="false"
+                            role="group"
+                            aria-label="Ações do gráfico">
+
+                            <button type="button"
+                                    class="menu-item-grafico"
+                                    data-action="vincular">
+                                <i class="fa-solid fa-link" aria-hidden="true"></i>
+                                <span>Vincular matriz RACIS</span>
                             </button>
 
-                            <button
-                                type="button"
-                                class="menu-item-grafico"
-                                data-action="gerar-excel"
-                            >
-                                <i class="fa-solid fa-file-excel"></i>
+                            <button type="button"
+                                    class="menu-item-grafico"
+                                    data-action="gerar-excel">
+                                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
                                 <span>Exportar para Excel</span>
                             </button>
 
-                            <button
-                                type="button"
-                                class="menu-item-grafico not-close"
-                                data-action="open-cronograma"
-                            >
-                                <i class="fa-solid fa-calendar-days"></i>
-                                <span>Abrir cronograma</span>
+                            <button type="button"
+                                    class="menu-item-grafico"
+                                    data-action="abrir-matriz"
+                                    hidden>
+                                <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+                                <span>Abrir matriz vinculada</span>
                             </button>
 
                             <div class="menu-divider"></div>
 
-                            <button type="button" class="menu-item-matriz danger not-close" data-action="delete">
-                                <i class="fa-solid fa-trash"></i>
-                                <span>Excluir matriz</span>
+                            <button type="button"
+                                    class="menu-item-grafico danger"
+                                    data-action="excluir-grafico">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                <span>Excluir gráfico</span>
                             </button>
                         </div>
+
                     </div>
                 </div>
             </div>
