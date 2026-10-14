@@ -1,3 +1,8 @@
+const nome = prompt(
+    "Não há cronogramas independentes disponíveis. Nome do novo cronograma:",
+    `${tituloMatriz.textContent} - Cronograma`
+);
+
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
@@ -36,6 +41,8 @@ let dadosRaci = {
     membros: [],
     atribuicoes: []
 };
+
+let fecharDialogoNexusAberto = null;
 
 const papeisRaci = ["R", "A", "C", "I", "S"];
 
@@ -96,6 +103,237 @@ function showToast(mensagem) {
     toastTimer = setTimeout(() => {
         toast.classList.remove("show");
     }, 3500);
+}
+
+// Cria e controla os campos e as listas personalizados do Nexus.
+function garantirDialogoNexus() {
+    let overlay = document.getElementById("nexus-dialog-overlay");
+
+    if (overlay) return overlay;
+
+    overlay = document.createElement("div");
+    overlay.id = "nexus-dialog-overlay";
+    overlay.className = "nexus-dialog-overlay";
+    overlay.hidden = true;
+
+    overlay.innerHTML = `
+        <section class="nexus-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nexus-dialog-title">
+
+            <div class="nexus-dialog-header">
+                <div>
+                    <h2 id="nexus-dialog-title"></h2>
+                    <p id="nexus-dialog-description" hidden></p>
+                </div>
+
+                <button type="button"
+                    class="nexus-dialog-close"
+                    aria-label="Fechar">
+                    &times;
+                </button>
+            </div>
+
+            <form id="nexus-dialog-form" novalidate>
+                <label class="nexus-dialog-input-wrap">
+                    <span id="nexus-dialog-label">Nome</span>
+                    <input id="nexus-dialog-input"
+                        type="text"
+                        maxlength="150"
+                        autocomplete="off"
+                        placeholder="Digite um nome">
+                </label>
+
+                <p id="nexus-dialog-error"
+                    class="nexus-dialog-error"
+                    hidden></p>
+
+                <div id="nexus-dialog-options"
+                    class="nexus-dialog-options"
+                    hidden></div>
+
+                <div class="nexus-dialog-actions">
+                    <button type="button"
+                        id="nexus-dialog-cancel"
+                        class="button secondary-button">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                        id="nexus-dialog-confirm"
+                        class="button primary-button">
+                        Adicionar
+                    </button>
+                </div>
+            </form>
+        </section>
+    `;
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function abrirDialogoNexus(config = {}) {
+    const overlay = garantirDialogoNexus();
+
+    // Fecha um painel anterior, caso ainda esteja aberto.
+    if (fecharDialogoNexusAberto) {
+        fecharDialogoNexusAberto(null);
+    }
+
+    const titulo = overlay.querySelector("#nexus-dialog-title");
+    const descricao = overlay.querySelector("#nexus-dialog-description");
+    const formulario = overlay.querySelector("#nexus-dialog-form");
+    const campo = overlay.querySelector("#nexus-dialog-input");
+    const campoRotulo = overlay.querySelector("#nexus-dialog-label");
+    const campoContainer = overlay.querySelector(".nexus-dialog-input-wrap");
+    const erro = overlay.querySelector("#nexus-dialog-error");
+    const lista = overlay.querySelector("#nexus-dialog-options");
+    const botaoCancelar = overlay.querySelector("#nexus-dialog-cancel");
+    const botaoConfirmar = overlay.querySelector("#nexus-dialog-confirm");
+    const botaoFechar = overlay.querySelector(".nexus-dialog-close");
+    const painel = overlay.querySelector(".nexus-dialog");
+
+    const temLista = Array.isArray(config.opcoes);
+
+    titulo.textContent = config.titulo || "Adicionar item";
+    descricao.textContent = config.descricao || "";
+    descricao.hidden = !config.descricao;
+
+    campoRotulo.textContent = config.rotulo || "Nome";
+    campo.placeholder = config.placeholder || "Digite um nome";
+    campo.value = config.valorInicial || "";
+    campo.maxLength = config.maxLength || 150;
+
+    campoContainer.hidden = temLista;
+    lista.hidden = !temLista;
+    botaoConfirmar.hidden = temLista;
+    erro.hidden = true;
+    erro.textContent = "";
+
+    lista.replaceChildren();
+
+    return new Promise(resolve => {
+        let finalizado = false;
+
+        function finalizar(valor = null) {
+            if (finalizado) return;
+
+            finalizado = true;
+            overlay.hidden = true;
+
+            overlay.onclick = null;
+            overlay.onkeydown = null;
+            formulario.onsubmit = null;
+            campo.oninput = null;
+            botaoCancelar.onclick = null;
+            botaoFechar.onclick = null;
+
+            if (fecharDialogoNexusAberto === finalizar) {
+                fecharDialogoNexusAberto = null;
+            }
+
+            resolve(valor);
+        }
+
+        fecharDialogoNexusAberto = finalizar;
+
+        if (temLista) {
+            config.opcoes.forEach(opcao => {
+                const botao = document.createElement("button");
+                botao.type = "button";
+                botao.className = "nexus-dialog-option";
+
+                const texto = document.createElement("span");
+                texto.textContent = opcao.texto;
+
+                const seta = document.createElement("span");
+                seta.className = "nexus-dialog-arrow";
+                seta.textContent = "›";
+
+                botao.append(texto, seta);
+                botao.addEventListener("click", () => {
+                    finalizar(opcao.valor);
+                });
+
+                lista.appendChild(botao);
+            });
+        }
+
+        formulario.onsubmit = event => {
+            event.preventDefault();
+
+            if (temLista) return;
+
+            const valor = campo.value.trim();
+
+            if (!valor) {
+                erro.textContent = "Digite um nome para continuar.";
+                erro.hidden = false;
+                campo.focus();
+                return;
+            }
+
+            finalizar(valor);
+        };
+
+        campo.oninput = () => {
+            erro.hidden = true;
+        };
+
+        botaoCancelar.onclick = () => finalizar(null);
+        botaoFechar.onclick = () => finalizar(null);
+
+        overlay.onclick = event => {
+            if (event.target === overlay) finalizar(null);
+        };
+
+        overlay.onkeydown = event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                finalizar(null);
+            }
+        };
+
+        overlay.hidden = false;
+
+        // ALTERADO: posiciona o painel perto do botão que o abriu.
+        const ancora = config.ancora;
+
+        if (ancora?.isConnected) {
+            const retangulo = ancora.getBoundingClientRect();
+            const largura = painel.offsetWidth || 380;
+
+            let esquerda = Math.min(
+                Math.max(12, retangulo.left),
+                window.innerWidth - largura - 12
+            );
+
+            let topo = retangulo.bottom + 8;
+
+            if (topo + painel.offsetHeight > window.innerHeight - 12) {
+                topo = Math.max(12, retangulo.top - painel.offsetHeight - 8);
+            }
+
+            esquerda = Math.max(12, esquerda);
+
+            painel.style.position = "fixed";
+            painel.style.left = `${esquerda}px`;
+            painel.style.top = `${topo}px`;
+        } else {
+            painel.style.position = "";
+            painel.style.left = "";
+            painel.style.top = "";
+        }
+
+        if (temLista) {
+            lista.querySelector("button")?.focus();
+        } else {
+            campo.focus();
+            campo.select();
+        }
+    });
 }
 
 // CARREGAR MATRIZES DO USUÁRIO
@@ -617,8 +855,17 @@ seletorMatriz.addEventListener("change", async () => {
 });
 
 // CRIAR TAREFA
-async function adicionarTarefa() {
-    const nome = prompt("Nome da nova tarefa:");
+async function adicionarTarefa(event) {
+    // Campo personalizado junto ao botão Tarefa.
+    const nome = await abrirDialogoNexus({
+        titulo: "Nova tarefa",
+        descricao: "Adicione uma atividade à matriz RACIS.",
+        rotulo: "Nome da tarefa",
+        placeholder: "Digite o nome da tarefa",
+        textoConfirmar: "Adicionar",
+        ancora: event?.currentTarget
+    });
+
     if (nome === null) return;
     if (!nome.trim()) {
         showToast("Informe o nome da tarefa.");
@@ -641,7 +888,7 @@ async function adicionarTarefa() {
     }
 }
 
-async function adicionarTarefaGantt() {
+async function adicionarTarefaGantt(event) {
     const cronograma = cronogramasUsuario.find(
         item => item.id === document.getElementById("ganttSelect").value
     );
@@ -653,7 +900,16 @@ async function adicionarTarefaGantt() {
         return;
     }
 
-    const nome = prompt("Nome da nova tarefa:");
+    // Campo personalizado junto ao botão Nova tarefa.
+    const nome = await abrirDialogoNexus({
+        titulo: "Nova tarefa no Gantt",
+        descricao: "A tarefa será adicionada à matriz vinculada a este gráfico.",
+        rotulo: "Nome da tarefa",
+        placeholder: "Digite o nome da tarefa",
+        textoConfirmar: "Adicionar",
+        ancora: event?.currentTarget
+    });
+
     if (nome === null) return;
 
     if (!nome.trim()) {
@@ -679,8 +935,17 @@ async function adicionarTarefaGantt() {
 }
 
 // CRIAR MEMBRO
-async function adicionarMembro() {
-    const nome = prompt("Nome do novo membro:");
+async function adicionarMembro(event) {
+    // Campo personalizado junto ao botão Membro.
+    const nome = await abrirDialogoNexus({
+        titulo: "Adicionar membro",
+        descricao: "Informe o nome do integrante da matriz.",
+        rotulo: "Nome do membro",
+        placeholder: "Digite o nome do membro",
+        textoConfirmar: "Adicionar",
+        ancora: event?.currentTarget
+    });
+
     if (nome === null) return;
     if (!nome.trim()) {
         showToast("Informe o nome do membro.");
@@ -818,8 +1083,6 @@ async function atualizarEstadoMenuMatriz(cronogramaSelecionadoId = null) {
     atualizarEstadoMenuGrafico();
 }
 
-
-
 function atualizarEstadoMenuGrafico() {
     const seletor = document.getElementById("ganttSelect");
 
@@ -852,8 +1115,16 @@ function atualizarEstadoMenuGrafico() {
     botaoAbrir.hidden = !grafico?.matriz_id;
 }
 
-async function criarGraficoGantt() {
-    const nome = prompt("Nome do novo gráfico Gantt:");
+async function criarGraficoGantt(event) {
+    // Campo personalizado junto ao botão Novo gráfico.
+    const nome = await abrirDialogoNexus({
+        titulo: "Novo gráfico Gantt",
+        descricao: "Crie um cronograma para organizar as atividades do projeto.",
+        rotulo: "Nome do gráfico",
+        placeholder: "Digite o nome do gráfico",
+        textoConfirmar: "Criar gráfico",
+        ancora: event?.currentTarget
+    });
 
     if (nome === null) return;
 
@@ -1434,30 +1705,35 @@ async function vincularMatrizAGantt() {
     let cronograma;
 
     if (disponiveis.length > 0) {
-        const lista = disponiveis
-            .map((item, indice) => `${indice + 1}. ${item.nome}`)
-            .join("\n");
+        // ALTERADO: mostra as matrizes disponíveis em um menu personalizado.
+        const matrizSelecionadaId = await abrirDialogoNexus({
+            titulo: "Vincular matriz RACIS",
+            descricao: `Selecione a matriz que será vinculada a "${grafico.nome}".`,
+            opcoes: disponiveis.map(matriz => ({
+                valor: String(matriz.id),
+                texto: matriz.nome
+            })),
+            ancora: botaoMenuGrafico
+        });
 
-        const resposta = prompt(
-            `Escolha o cronograma para vincular:\n\n${lista}\n\nDigite o número desejado.`,
-            "1"
+        if (matrizSelecionadaId === null) return;
+
+        const matrizSelecionada = disponiveis.find(
+            matriz => String(matriz.id) === matrizSelecionadaId
         );
 
-        if (resposta === null) return;
-
-        const indice = Number(resposta) - 1;
-
-        if (!Number.isInteger(indice) || !disponiveis[indice]) {
-            showToast("Seleção de cronograma inválida.");
-            return;
-        }
-
-        cronograma = disponiveis[indice];
+        if (!matrizSelecionada) return;
     } else {
-        const nome = prompt(
-            "Não há cronogramas independentes disponíveis. Nome do novo cronograma:",
-            `${tituloMatriz.textContent} - Cronograma`
-        );
+        // Permite criar um gráfico pelo painel personalizado.
+        const nome = await abrirDialogoNexus({
+            titulo: "Criar gráfico Gantt",
+            descricao: "Não há gráficos livres para vincular. Crie um novo gráfico para esta matriz.",
+            rotulo: "Nome do gráfico",
+            placeholder: "Digite o nome do gráfico",
+            valorInicial: `${tituloMatriz.textContent} - Cronograma`,
+            textoConfirmar: "Criar e vincular",
+            ancora: botaoMenuMatriz
+        });
 
         if (nome === null) return;
 
@@ -1484,6 +1760,7 @@ async function vincularMatrizAGantt() {
     await renderizarGanttVinculado();
 
     showToast("Matriz vinculada ao gráfico de Gantt.");
+
 }
 
 
@@ -1550,7 +1827,15 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
 
     } else if (acao === "nova-matriz") {
         botao.addEventListener("click", async () => {
-            const nome = prompt("Nome da nova matriz:");
+            // Campo personalizado junto ao botão Nova matriz.
+            const nome = await abrirDialogoNexus({
+                titulo: "Nova matriz RACIS",
+                descricao: "Crie uma matriz para organizar as responsabilidades do projeto.",
+                rotulo: "Nome da matriz",
+                placeholder: "Digite o nome da matriz",
+                textoConfirmar: "Criar matriz",
+                ancora: botao
+            });
 
             if (nome === null) return;
 
