@@ -22,7 +22,7 @@ def listar_matrizes(
     # Busca as matrizes que já existem para o usuário.
     cursor.execute(
         """
-        SELECT id, usuario_id, nome, created_at
+        SELECT id, usuario_id, nome, created_at, is_padrao;
         FROM matrizes
         WHERE usuario_id = %s
         ORDER BY created_at ASC;
@@ -38,7 +38,7 @@ def listar_matrizes(
             """
             INSERT INTO matrizes (nome, usuario_id, is_padrao)
             VALUES (%s, %s, TRUE)
-            RETURNING id, usuario_id, nome, created_at;
+            RETURNING id, usuario_id, nome, created_at, is_padrao;
             """,
             ["Matriz Padrão", str(usuario["id"])],
         )

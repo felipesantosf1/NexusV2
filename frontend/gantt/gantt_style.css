@@ -114,4 +114,15 @@
     background: #392426;
 }
 
+/* Mantém o Gantt padrão apagado mesmo sendo ação perigosa. */
+.menu-item-grafico.danger:disabled,
+.menu-item-grafico.danger:disabled i {
+    color: var(--text-muted);
+}
+
+.menu-item-grafico.danger:disabled:hover {
+    background: transparent;
+}
+
 .connected-pill.is-disconnected { background-color: #3a2626; color: #f59b9b; border-color: #604444;}
+

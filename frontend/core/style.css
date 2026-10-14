@@ -254,9 +254,9 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
     width: 100%;
     min-height: 40px;
     padding: 9px 11px;
-    border: 1px solid transparent;
+    border: 1px solid var(--border); /* Adicionado uma bordinha sutil para destacar ainda mais */
     border-radius: 8px;
-    background: transparent;
+    background: var(--surface); /* Fundo diferente do painel (--surface-raised) */
     color: var(--text);
     font-size: 12px;
     text-align: left;
@@ -266,7 +266,7 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
 
 .nexus-dialog-option:hover,
 .nexus-dialog-option:focus-visible {
-    border-color: var(--border);
+    border-color: var(--blue); /* Ou manter var(--border) se preferir */
     background: var(--surface-hover);
 }
 
@@ -285,6 +285,24 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
 
 .nexus-dialog-actions button {
     min-height: 34px;
+}
+
+/* Aparência desabilitada para a exclusão da matriz padrão. */
+.menu-item-matriz:disabled,
+.menu-item-matriz.danger:disabled {
+    color: var(--text-muted);
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.menu-item-matriz:disabled i,
+.menu-item-matriz.danger:disabled i {
+    color: var(--text-muted);
+}
+
+.menu-item-matriz:disabled:hover,
+.menu-item-matriz.danger:disabled:hover {
+    background: transparent;
 }
 
 /* FOOTER */

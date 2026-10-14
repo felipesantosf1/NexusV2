@@ -344,6 +344,7 @@ async function carregarMatrizes(idSelecionado = null) {
         const opcao = document.createElement("option");
         opcao.value = matriz.id;
         opcao.textContent = matriz.nome;
+        opcao.dataset.isPadrao = String(Boolean(matriz.is_padrao));
         seletorMatriz.appendChild(opcao);
     });
 
@@ -465,15 +466,25 @@ function ativarEdicaoDuploClique(elemento, salvar, depoisDeSalvar) {
 }
 
 // BOTÃO DE EXCLUSÃO
-function criarBotaoExcluir(rotulo, acao) {
+// BOTÃO DE EXCLUSÃO
+function criarBotaoExcluir(rotulo, acao, desabilitado = false) { // #ALTERADO
     const botao = document.createElement("button");
     botao.type = "button";
     botao.className = "raci-delete-button";
-    botao.title = `Excluir ${rotulo}`;
-    botao.setAttribute("aria-label", `Excluir ${rotulo}`);
+
+    botao.disabled = desabilitado; // #ALTERADO
+
+    // #ALTERADO: informa por que o botão está desabilitado.
+    botao.title = desabilitado
+        ? `${rotulo} é um item padrão e não pode ser excluído.`
+        : `Excluir ${rotulo}`;
+
+    botao.setAttribute("aria-label", botao.title); // #ALTERADO
     botao.innerHTML = '<i class="fa-solid fa-trash"></i>';
 
     botao.addEventListener("click", async event => {
+        if (botao.disabled) return; // #ALTERADO
+
         event.stopPropagation();
         await acao();
     });
@@ -653,7 +664,8 @@ function renderizarRaci() {
             cabecalhoMembro.appendChild(
                 criarBotaoExcluir(
                     membro.nome,
-                    () => excluirMembro(membro)
+                    () => excluirMembro(membro),
+                    membro.is_padrao
                 )
             );
         }
@@ -700,7 +712,8 @@ function renderizarRaci() {
             grupoTarefa.appendChild(
                 criarBotaoExcluir(
                     tarefa.nome,
-                    () => excluirTarefa(tarefa)
+                    () => excluirTarefa(tarefa),
+                    tarefa.is_padrao
                 )
             );
         }
@@ -887,8 +900,9 @@ async function adicionarTarefa(event) {
 }
 
 async function adicionarTarefaGantt(event) {
+    // Compara os IDs como texto para evitar incompatibilidade de tipos.
     const cronograma = cronogramasUsuario.find(
-        item => item.id === document.getElementById("ganttSelect").value
+        item => String(item.id) === String(document.getElementById("ganttSelect").value)
     );
 
     if (!cronograma?.matriz_id) {
@@ -1029,11 +1043,32 @@ async function atualizarEstadoMenuMatriz(cronogramaSelecionadoId = null) {
             String(cronograma.matriz_id) === String(matrizAtualId)
     );
 
+    // Identifica a matriz padrão selecionada.
+    const opcaoMatrizAtual = [...seletorMatriz.options].find(
+        opcao => String(opcao.value) === String(matrizAtualId)
+    );
+
+    const matrizPadrao = opcaoMatrizAtual?.dataset.isPadrao === "true";
+
+    // Desabilita a exclusão da matriz padrão.
+    const botaoExcluirMatriz = menuMatriz.querySelector(
+        '[data-action="delete"]'
+    );
+
+    botaoExcluirMatriz.disabled = !opcaoMatrizAtual || matrizPadrao;
+
+    botaoExcluirMatriz.title = matrizPadrao
+        ? "A matriz padrão não pode ser excluída."
+        : "Excluir matriz";
+
     menuMatriz.dataset.hasCronograma = vinculado ? "true" : "false";
 
     const botaoVincular = menuMatriz.querySelector(
         '[data-action="vincular"]'
     );
+
+    // Impede desvincular o Gantt da matriz padrão.
+    botaoVincular.disabled = matrizPadrao && Boolean(vinculado);
 
     botaoVincular.querySelector("span").textContent = vinculado
         ? "Desvincular gráfico de Gantt"
@@ -1052,7 +1087,7 @@ async function atualizarEstadoMenuMatriz(cronogramaSelecionadoId = null) {
         seletorGantt.appendChild(opcao);
     });
 
-    // ALTERADO: prioriza o gráfico informado, como um gráfico recém-criado.
+    // Prioriza o gráfico informado, como um gráfico recém-criado.
     const novoGraficoExiste =
         cronogramaSelecionadoId != null &&
         cronogramasUsuario.some(
@@ -1102,8 +1137,16 @@ function atualizarEstadoMenuGrafico() {
         '[data-action="abrir-matriz"]'
     );
 
-    botaoVincular.disabled = !grafico;
-    botaoExcluir.disabled = !grafico;
+    // Identifica o Gantt vinculado à matriz padrão.
+    const graficoPadrao = Boolean(grafico?.matriz_is_padrao);
+
+    // Desabilita exclusão e desvinculação do Gantt padrão.
+    botaoVincular.disabled = !grafico || graficoPadrao;
+    botaoExcluir.disabled = !grafico || graficoPadrao;
+
+    botaoExcluir.title = graficoPadrao
+        ? "O gráfico padrão não pode ser excluído."
+        : "Excluir gráfico";
 
     botaoVincular.querySelector("span").textContent =
         grafico?.matriz_id
@@ -1156,6 +1199,12 @@ async function excluirGraficoAtual() {
 
     if (!grafico) {
         showToast("Selecione um gráfico para excluir.");
+        return;
+    }
+    
+    // Impede excluir o Gantt padrão mesmo por chamada direta.
+    if (grafico.matriz_is_padrao) {
+        showToast("O gráfico padrão não pode ser excluído.");
         return;
     }
 
@@ -1645,7 +1694,15 @@ async function exportarMatrizExcel() {
 }
 
 async function excluirMatrizAtual() {
-    const nome = seletorMatriz.selectedOptions[0]?.textContent || "esta matriz";
+    // #ALTERADO: proteção adicional para a matriz padrão.
+    const matrizSelecionada = seletorMatriz.selectedOptions[0];
+
+    if (matrizSelecionada?.dataset.isPadrao === "true") {
+        showToast("A matriz padrão não pode ser excluída.");
+        return;
+    }
+
+    const nome = matrizSelecionada?.textContent || "esta matriz";
 
     if (!confirm(`Tem certeza de que deseja excluir "${nome}"? Esta ação não pode ser desfeita.`)) {
         return;
@@ -1763,8 +1820,11 @@ async function vincularMatrizAGantt() {
 async function abrirCronogramaVinculado() {
     await atualizarEstadoMenuMatriz();
 
+    // Normaliza os IDs e ignora cronogramas independentes.
     const cronograma = cronogramasUsuario.find(
-        item => item.matriz_id === matrizAtualId
+        item =>
+            item.matriz_id != null &&
+            String(item.matriz_id) === String(matrizAtualId)
     );
 
     if (!cronograma) {

@@ -19,3 +19,4 @@ class MatrizResposta(BaseModel):
     usuario_id: UUID
     nome: str
     created_at: datetime
+    is_padrao: bool  

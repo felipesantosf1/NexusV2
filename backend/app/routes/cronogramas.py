@@ -30,6 +30,7 @@ def listar_cronogramas(dados=Depends(get_db), usuario=Depends(get_current_user))
             c.id,
             c.usuario_id,
             c.matriz_id,
+            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
             COALESCE(m.nome, c.nome) AS nome,
             c.created_at
         FROM cronogramas AS c
@@ -118,14 +119,31 @@ def atualizar_vinculo(
 
     cursor.execute(
         """
-        SELECT id FROM cronogramas
-        WHERE id = %s AND usuario_id = %s;
+        SELECT
+            c.id,
+            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
+        FROM cronogramas AS c
+        LEFT JOIN matrizes AS m
+            ON m.id = c.matriz_id
+            AND m.usuario_id = c.usuario_id
+        WHERE c.id = %s AND c.usuario_id = %s;
         """,
         [str(cronograma_id), usuario_id],
     )
-    if not cursor.fetchone():
+    cronograma_atual = cursor.fetchone()
+
+    if not cronograma_atual:
         cursor.close()
         raise HTTPException(404, "Cronograma não encontrado.")
+
+    if entrada.matriz_id is None and cronograma_atual["matriz_is_padrao"]:
+        cursor.close()
+        raise HTTPException(
+            400,
+            "O gráfico padrão não pode ser desvinculado da matriz padrão."
+        )
+
+
 
     if entrada.matriz_id is not None:
         cursor.execute(
@@ -180,8 +198,39 @@ def atualizar_vinculo(
 
 
 @router.delete("/{cronograma_id}", status_code=204)
-def excluir_cronograma(cronograma_id: UUID, dados=Depends(get_db), usuario=Depends(get_current_user)):
+def excluir_cronograma(
+    cronograma_id: UUID,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user)
+):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    # #ALTERADO: identifica se o gráfico está vinculado à matriz padrão.
+    cursor.execute(
+        """
+        SELECT COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
+        FROM cronogramas AS c
+        LEFT JOIN matrizes AS m
+            ON m.id = c.matriz_id
+            AND m.usuario_id = c.usuario_id
+        WHERE c.id = %s AND c.usuario_id = %s;
+        """,
+        [str(cronograma_id), str(usuario["id"])]
+    )
+
+    cronograma = cursor.fetchone()
+
+    if not cronograma:
+        cursor.close()
+        raise HTTPException(404, "Gráfico não encontrado.")
+
+    # #ALTERADO: proteção no servidor contra exclusão do Gantt padrão.
+    if cronograma["matriz_is_padrao"]:
+        cursor.close()
+        raise HTTPException(
+            400,
+            "O gráfico padrão não pode ser excluído."
+        )
 
     cursor.execute(
         """
@@ -189,7 +238,7 @@ def excluir_cronograma(cronograma_id: UUID, dados=Depends(get_db), usuario=Depen
         WHERE id = %s AND usuario_id = %s
         RETURNING id;
         """,
-        [str(cronograma_id), str(usuario["id"])],
+        [str(cronograma_id), str(usuario["id"])]
     )
 
     cronograma_excluido = cursor.fetchone()
@@ -198,8 +247,6 @@ def excluir_cronograma(cronograma_id: UUID, dados=Depends(get_db), usuario=Depen
         cursor.close()
         raise HTTPException(404, "Gráfico não encontrado.")
 
-    # Exclui apenas o gráfico.
-    # A matriz e as tarefas RACIS permanecem no banco.
     dados.commit()
     cursor.close()
 
