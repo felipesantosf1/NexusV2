@@ -1588,17 +1588,18 @@ async function renderizarGanttVinculado() {
 
             // ALTERADO: salva o nome e atualiza a linha imediatamente.
             ativarEdicaoDuploClique(
-                nomeTarefa,
                 async novoNome => {
-                    await requisicaoApi(
+                    // Recebe a tarefa atualizada e mantém a memória sincronizada.
+                    const tarefaAtualizada = await requisicaoApi(
                         `/cronogramas/${cronograma.id}/tarefas/${tarefa.id}`,
                         {
                             method: "PUT",
                             body: JSON.stringify({ nome: novoNome })
                         }
                     );
+
+                    tarefa.nome = tarefaAtualizada.nome;
                 },
-                async () => renderizarGanttVinculado()
             );
         });
 
@@ -1717,13 +1718,16 @@ async function renderizarGanttVinculado() {
             nomeTarefa,
 
             async novoNome => {
-                await requisicaoApi(
+                // Recebe a tarefa atualizada e mantém a memória sincronizada.
+                const tarefaAtualizada = await requisicaoApi(
                     `/matrizes/${cronograma.matriz_id}/tarefas-raci/${tarefa.id}`,
                     {
                         method: "PUT",
                         body: JSON.stringify({ nome: novoNome })
                     }
                 );
+
+                tarefa.nome = tarefaAtualizada.nome;
             },
 
             async () => {

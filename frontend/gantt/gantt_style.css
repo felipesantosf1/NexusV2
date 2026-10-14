@@ -161,3 +161,23 @@
     opacity: 0.35;
 }
 
+/* NOVO: organiza o número e o nome da tarefa em uma linha flexível. */
+.gantt-task-name-group {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* NOVO: evita que o campo de edição seja reduzido a "...". */
+.gantt-task-name-group .raci-inline-edit {
+    flex: 1 1 120px;
+    width: 100%;
+    min-width: 120px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
+    text-overflow: clip;
+}
