@@ -1453,10 +1453,18 @@ async function renderizarGanttVinculado() {
         tituloGantt.textContent = cronograma?.nome || "Cronograma Gantt";
     }
 
+    // Mostra o nome da matriz, não o nome do gráfico.
     if (tituloContexto) {
         tituloContexto.textContent = vinculado
-            ? `Cronograma vinculado à matriz "${cronograma.nome}"`
+            ? `Cronograma vinculado à matriz "${cronograma.matriz_nome}"`
             : "Cronograma independente";
+    }
+
+    // Os nomes são independentes; somente as tarefas são compartilhadas.
+    if (descricaoContexto) {
+        descricaoContexto.textContent = vinculado
+            ? "As tarefas são compartilhadas com a matriz RACIS."
+            : "Este cronograma funciona de forma independente.";
     }
 
     if (descricaoContexto) {
@@ -1522,6 +1530,7 @@ async function renderizarGanttVinculado() {
             linha.className = "gantt-task-row";
 
             const grupo = document.createElement("span");
+            grupo.className = "gantt-task-name-group";
 
             const numero = document.createElement("b");
             numero.textContent = String(indice + 1).padStart(2, "0");

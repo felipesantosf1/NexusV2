@@ -30,9 +30,9 @@ def listar_cronogramas(dados=Depends(get_db), usuario=Depends(get_current_user))
             c.id,
             c.usuario_id,
             c.matriz_id,
-            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
             c.nome,
             c.is_padrao,
+            m.nome AS matriz_nome,
             COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
             c.created_at
         FROM cronogramas AS c
