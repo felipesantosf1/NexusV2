@@ -5,6 +5,7 @@ const supabaseClient = window.supabaseClient;
 
 const seletorMatriz = document.getElementById("matrixSelect-raci");
 const tituloMatriz = document.querySelector(".raci-panel .matrix-title-row h2");
+const tituloGanttEditavel = document.querySelector("#view-gantt .gantt-panel .matrix-title-row h2");
 const tabelaRaci = document.querySelector(".raci-table");
 const cabecalhoRaci = tabelaRaci.querySelector("thead");
 const corpoRaci = tabelaRaci.querySelector("tbody");
@@ -16,6 +17,7 @@ const wrapperMenuMatriz = document.querySelector("#view-raci .menu-actions-wrapp
 const botaoMenuGrafico = document.getElementById("btn-menu-grafico");
 const menuGrafico = document.getElementById("menu-grafico");
 const wrapperMenuGrafico = botaoMenuGrafico.closest(".menu-actions-wrapper");
+
 
 const menuRaci = document.getElementById("menu-raci");
 
@@ -523,6 +525,81 @@ ativarEdicaoDuploClique(
         }
 
         await atualizarEstadoMenuMatriz();
+        await renderizarGanttVinculado();
+    }
+);
+
+ativarEdicaoDuploClique(
+    tituloGanttEditavel,
+
+    async nome => {
+        const seletor = document.getElementById("ganttSelect");
+
+        const grafico = cronogramasUsuario.find(
+            item => String(item.id) === String(seletor.value)
+        );
+
+        if (!grafico) {
+            throw new Error("Nenhum gráfico foi selecionado.");
+        }
+
+        // gráficos vinculados mantêm o nome sincronizado
+        // com a matriz; gráficos independentes alteram seu próprio nome.
+        if (grafico.matriz_id) {
+            await requisicaoApi(`/matrizes/${grafico.matriz_id}`, {
+                method: "PUT",
+                body: JSON.stringify({ nome })
+            });
+        } else {
+            await requisicaoApi(`/cronogramas/${grafico.id}`, {
+                method: "PUT",
+                body: JSON.stringify({ nome })
+            });
+        }
+    },
+
+    async nome => {
+        const seletor = document.getElementById("ganttSelect");
+
+        const grafico = cronogramasUsuario.find(
+            item => String(item.id) === String(seletor.value)
+        );
+
+        if (!grafico) return;
+
+        // atualiza o nome na lista de matrizes quando
+        // o gráfico está vinculado à matriz correspondente.
+        if (grafico.matriz_id) {
+            const opcaoMatriz = Array.from(seletorMatriz.options).find(
+                opcao =>
+                    String(opcao.value) === String(grafico.matriz_id)
+            );
+
+            if (opcaoMatriz) {
+                opcaoMatriz.textContent = nome;
+            }
+
+            if (String(matrizAtualId) === String(grafico.matriz_id)) {
+                tituloMatriz.textContent = nome;
+            }
+        }
+
+        // recarrega os dados e atualiza o título exibido.
+        const graficoId = String(grafico.id);
+
+        await atualizarEstadoMenuMatriz();
+
+        const seletorAtualizado = document.getElementById("ganttSelect");
+
+        if (
+            Array.from(seletorAtualizado.options).some(
+                opcao => String(opcao.value) === graficoId
+            )
+        ) {
+            seletorAtualizado.value = graficoId;
+        }
+
+        atualizarEstadoMenuGrafico();
         await renderizarGanttVinculado();
     }
 );
