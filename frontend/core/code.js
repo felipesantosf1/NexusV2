@@ -1,7 +1,3 @@
-const nome = prompt(
-    "Não há cronogramas independentes disponíveis. Nome do novo cronograma:",
-    `${tituloMatriz.textContent} - Cronograma`
-);
 
 const sidebar = document.getElementById("sidebar");
 const toggleSidebar = document.getElementById("toggleSidebar");
@@ -209,6 +205,8 @@ function abrirDialogoNexus(config = {}) {
     campoContainer.hidden = temLista;
     lista.hidden = !temLista;
     botaoConfirmar.hidden = temLista;
+    botaoConfirmar.textContent = config.textoConfirmar || "Adicionar";
+    
     erro.hidden = true;
     erro.textContent = "";
 
@@ -1237,30 +1235,31 @@ async function vincularMatrizAoGraficoAtual() {
             return;
         }
 
-        const lista = disponiveis
-            .map((matriz, indice) => `${indice + 1}. ${matriz.nome}`)
-            .join("\n");
+        // Lista clicável.
+        const matrizSelecionadaId = await abrirDialogoNexus({
+            titulo: "Vincular matriz RACIS",
+            descricao: `Selecione a matriz que será vinculada a "${grafico.nome}".`,
+            opcoes: disponiveis.map(matriz => ({
+                valor: String(matriz.id),
+                texto: matriz.nome
+            })),
+            ancora: botaoMenuGrafico
+        });
 
-        const resposta = prompt(
-            `Escolha a matriz para "${grafico.nome}":\n\n${lista}\n\nDigite o número desejado.`,
-            "1"
+        if (matrizSelecionadaId === null) return;
+
+        const matrizSelecionada = disponiveis.find(
+            matriz => String(matriz.id) === matrizSelecionadaId
         );
 
-        if (resposta === null) return;
-
-        const indice = Number(resposta) - 1;
-
-        if (!Number.isInteger(indice) || !disponiveis[indice]) {
-            showToast("Seleção de matriz inválida.");
-            return;
-        }
+        if (!matrizSelecionada) return;
 
         await requisicaoApi(
             `/cronogramas/${grafico.id}/vinculo`,
             {
                 method: "PUT",
                 body: JSON.stringify({
-                    matriz_id: disponiveis[indice].id
+                    matriz_id: matrizSelecionada.id
                 })
             }
         );
@@ -1704,48 +1703,45 @@ async function vincularMatrizAGantt() {
 
     let cronograma;
 
-    if (disponiveis.length > 0) {
-        // ALTERADO: mostra as matrizes disponíveis em um menu personalizado.
-        const matrizSelecionadaId = await abrirDialogoNexus({
-            titulo: "Vincular matriz RACIS",
-            descricao: `Selecione a matriz que será vinculada a "${grafico.nome}".`,
-            opcoes: disponiveis.map(matriz => ({
-                valor: String(matriz.id),
-                texto: matriz.nome
-            })),
-            ancora: botaoMenuGrafico
-        });
+    if (disponiveis.length > 0) { // #ALTERADO
+        // #ALTERADO: apresenta os cronogramas disponíveis em uma lista clicável.
+        const cronogramaSelecionadoId = await abrirDialogoNexus({
+            titulo: "Vincular gráfico Gantt", // #ALTERADO
+            descricao: `Selecione o gráfico que será vinculado à matriz "${tituloMatriz.textContent}".`, // #ALTERADO
+            opcoes: disponiveis.map(item => ({ // #ALTERADO
+                valor: String(item.id), // #ALTERADO
+                texto: item.nome // #ALTERADO
+            })), // #ALTERADO
+            ancora: botaoMenuMatriz // #ALTERADO
+        }); // #ALTERADO
 
-        if (matrizSelecionadaId === null) return;
+        if (cronogramaSelecionadoId === null) return; // #ALTERADO
 
-        const matrizSelecionada = disponiveis.find(
-            matriz => String(matriz.id) === matrizSelecionadaId
-        );
+        // #ALTERADO: guarda o cronograma escolhido para a requisição seguinte.
+        cronograma = disponiveis.find(
+            item => String(item.id) === cronogramaSelecionadoId
+        ); // #ALTERADO
 
-        if (!matrizSelecionada) return;
-    } else {
-        // Permite criar um gráfico pelo painel personalizado.
+        if (!cronograma) return; // #ALTERADO
+    } else { // #ALTERADO
+        // #ALTERADO: abre o painel para criar um cronograma quando não há opções.
         const nome = await abrirDialogoNexus({
-            titulo: "Criar gráfico Gantt",
-            descricao: "Não há gráficos livres para vincular. Crie um novo gráfico para esta matriz.",
-            rotulo: "Nome do gráfico",
-            placeholder: "Digite o nome do gráfico",
-            valorInicial: `${tituloMatriz.textContent} - Cronograma`,
-            textoConfirmar: "Criar e vincular",
-            ancora: botaoMenuMatriz
-        });
+            titulo: "Criar gráfico Gantt", // #ALTERADO
+            descricao: "Não há gráficos livres para vincular. Crie um novo gráfico para esta matriz.", // #ALTERADO
+            rotulo: "Nome do gráfico", // #ALTERADO
+            placeholder: "Digite o nome do gráfico", // #ALTERADO
+            valorInicial: `${tituloMatriz.textContent} - Cronograma`, // #ALTERADO
+            textoConfirmar: "Criar e vincular", // #ALTERADO
+            ancora: botaoMenuMatriz // #ALTERADO
+        }); // #ALTERADO
 
-        if (nome === null) return;
+        if (nome === null) return; // #ALTERADO
 
-        if (!nome.trim()) {
-            showToast("Informe um nome para o cronograma.");
-            return;
-        }
-
+        // #ALTERADO: armazena o cronograma criado na mesma variável.
         cronograma = await requisicaoApi("/cronogramas/", {
             method: "POST",
             body: JSON.stringify({ nome: nome.trim() })
-        });
+        }); // #ALTERADO
     }
 
     await requisicaoApi(
