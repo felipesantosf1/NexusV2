@@ -1068,7 +1068,7 @@ async function atualizarEstadoMenuMatriz(cronogramaSelecionadoId = null) {
     );
 
     // Impede desvincular o Gantt da matriz padrão.
-    botaoVincular.disabled = matrizPadrao && Boolean(vinculado);
+    botaoVincular.disabled = !opcaoMatrizAtual;
 
     botaoVincular.querySelector("span").textContent = vinculado
         ? "Desvincular gráfico de Gantt"
@@ -1137,12 +1137,13 @@ function atualizarEstadoMenuGrafico() {
         '[data-action="abrir-matriz"]'
     );
 
-    // Identifica o Gantt vinculado à matriz padrão.
-    const graficoPadrao = Boolean(grafico?.matriz_is_padrao);
+    const graficoPadrao = Boolean(grafico?.is_padrao || grafico?.matriz_is_padrao);
 
-    // Desabilita exclusão e desvinculação do Gantt padrão.
-    botaoVincular.disabled = !grafico || graficoPadrao;
-    botaoExcluir.disabled = !grafico || graficoPadrao;
+    // Permite vincular ou desvincular qualquer gráfico existente.
+    botaoVincular.disabled = !grafico;
+
+    // O Gantt padrão continua protegido contra exclusão.
+    botaoExcluir.disabled = !grafico || graficoPadrao; 
 
     botaoExcluir.title = graficoPadrao
         ? "O gráfico padrão não pode ser excluído."
@@ -1201,9 +1202,9 @@ async function excluirGraficoAtual() {
         showToast("Selecione um gráfico para excluir.");
         return;
     }
-    
+
     // Impede excluir o Gantt padrão mesmo por chamada direta.
-    if (grafico.matriz_is_padrao) {
+    if (grafico.is_padrao || grafico.matriz_is_padrao) {
         showToast("O gráfico padrão não pode ser excluído.");
         return;
     }

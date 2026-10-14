@@ -22,7 +22,7 @@ def listar_matrizes(
     # Busca as matrizes que já existem para o usuário.
     cursor.execute(
         """
-        SELECT id, usuario_id, nome, created_at, is_padrao;
+        SELECT id, usuario_id, nome, created_at, is_padrao
         FROM matrizes
         WHERE usuario_id = %s
         ORDER BY created_at ASC;

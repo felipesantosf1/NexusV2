@@ -116,6 +116,7 @@ def atualizar_vinculo(
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
     usuario_id = str(usuario["id"])
+    matriz_destino_padrao = False
 
     cursor.execute(
         """
@@ -136,19 +137,10 @@ def atualizar_vinculo(
         cursor.close()
         raise HTTPException(404, "Cronograma não encontrado.")
 
-    if entrada.matriz_id is None and cronograma_atual["matriz_is_padrao"]:
-        cursor.close()
-        raise HTTPException(
-            400,
-            "O gráfico padrão não pode ser desvinculado da matriz padrão."
-        )
-
-
-
     if entrada.matriz_id is not None:
         cursor.execute(
             """
-            SELECT id FROM matrizes
+            SELECT id, is_padrao FROM matrizes
             WHERE id = %s AND usuario_id = %s;
             """,
             [str(entrada.matriz_id), usuario_id],
@@ -181,16 +173,19 @@ def atualizar_vinculo(
     cursor.execute(
         """
         UPDATE cronogramas
-        SET matriz_id = %s
+        SET matriz_id = %s,
+            is_padrao = (is_padrao OR %s)
         WHERE id = %s AND usuario_id = %s
-        RETURNING id, usuario_id, matriz_id, nome, created_at;
+        RETURNING id, usuario_id, matriz_id, nome, created_at, is_padrao;
         """,
         [
             str(entrada.matriz_id) if entrada.matriz_id else None,
+            matriz_destino_padrao,  # #ALTERADO
             str(cronograma_id),
             usuario_id,
         ],
     )
+
     cronograma = cursor.fetchone()
     dados.commit()
     cursor.close()
@@ -208,7 +203,9 @@ def excluir_cronograma(
     # #ALTERADO: identifica se o gráfico está vinculado à matriz padrão.
     cursor.execute(
         """
-        SELECT COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
+        SELECT
+        c.is_padrao,
+        COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
         FROM cronogramas AS c
         LEFT JOIN matrizes AS m
             ON m.id = c.matriz_id
@@ -224,8 +221,8 @@ def excluir_cronograma(
         cursor.close()
         raise HTTPException(404, "Gráfico não encontrado.")
 
-    # #ALTERADO: proteção no servidor contra exclusão do Gantt padrão.
-    if cronograma["matriz_is_padrao"]:
+    # Proteção no servidor contra exclusão do Gantt padrão.
+    if cronograma["is_padrao"] or cronograma["matriz_is_padrao"]:
         cursor.close()
         raise HTTPException(
             400,
