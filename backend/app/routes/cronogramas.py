@@ -31,7 +31,9 @@ def listar_cronogramas(dados=Depends(get_db), usuario=Depends(get_current_user))
             c.usuario_id,
             c.matriz_id,
             COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
-            COALESCE(m.nome, c.nome) AS nome,
+            c.nome,
+            c.is_padrao,
+            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
             c.created_at
         FROM cronogramas AS c
         LEFT JOIN matrizes AS m
@@ -249,3 +251,189 @@ def excluir_cronograma(
 
     return None
 
+# Verifica se o gráfico existe e está independente.
+def verificar_cronograma_independente(cursor, cronograma_id, usuario_id):
+    cursor.execute(
+        """
+        SELECT id, matriz_id
+        FROM cronogramas
+        WHERE id = %s AND usuario_id = %s;
+        """,
+        [str(cronograma_id), str(usuario_id)],
+    )
+
+    cronograma = cursor.fetchone()
+
+    if not cronograma:
+        raise HTTPException(404, "Gráfico não encontrado.")
+
+    if cronograma["matriz_id"] is not None:
+        raise HTTPException(
+            409,
+            "Este gráfico está vinculado. Gerencie as tarefas pela matriz RACIS.",
+        )
+
+    return cronograma
+
+
+# Listar tarefas de um Gantt independente.
+@router.get("/{cronograma_id}/tarefas")
+def listar_tarefas_gantt(
+    cronograma_id: UUID,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    verificar_cronograma_independente(
+        cursor, cronograma_id, usuario["id"]
+    )
+
+    cursor.execute(
+        """
+        SELECT id, cronograma_id, nome, data_inicio, data_fim,
+        status, ordem, is_padrao, created_at
+        FROM tarefas_cronograma
+        WHERE cronograma_id = %s
+        ORDER BY ordem, created_at;
+        """,
+        [str(cronograma_id)],
+    )
+
+    tarefas = cursor.fetchall()
+    cursor.close()
+    return tarefas
+
+
+# Criar tarefa de Gantt independente.
+@router.post("/{cronograma_id}/tarefas", status_code=201)
+def criar_tarefa_gantt(
+    cronograma_id: UUID,
+    entrada: CronogramaAtualizacao,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    nome = entrada.nome.strip()
+
+    if not nome:
+        raise HTTPException(400, "Informe o nome da tarefa.")
+
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    verificar_cronograma_independente(
+        cursor, cronograma_id, usuario["id"]
+    )
+
+    cursor.execute(
+        """
+        SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
+        FROM tarefas_cronograma
+        WHERE cronograma_id = %s;
+        """,
+        [str(cronograma_id)],
+    )
+    ordem = cursor.fetchone()["proxima"]
+
+    cursor.execute(
+        """
+        INSERT INTO tarefas_cronograma
+            (cronograma_id, nome, ordem, is_padrao)
+        VALUES (%s, %s, %s, FALSE)
+        RETURNING id, cronograma_id, nome, data_inicio, data_fim,
+        status, ordem, is_padrao, created_at;
+        """,
+        [str(cronograma_id), nome, ordem],
+    )
+
+    tarefa = cursor.fetchone()
+    dados.commit()
+    cursor.close()
+    return tarefa
+
+
+# Renomear uma tarefa de Gantt independente.
+@router.put("/{cronograma_id}/tarefas/{tarefa_id}")
+def renomear_tarefa_gantt(
+    cronograma_id: UUID,
+    tarefa_id: UUID,
+    entrada: CronogramaAtualizacao,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    nome = entrada.nome.strip()
+
+    if not nome:
+        raise HTTPException(400, "Informe o nome da tarefa.")
+
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    verificar_cronograma_independente(
+        cursor, cronograma_id, usuario["id"]
+    )
+
+    cursor.execute(
+        """
+        UPDATE tarefas_cronograma
+        SET nome = %s
+        WHERE id = %s AND cronograma_id = %s
+        RETURNING id, cronograma_id, nome, data_inicio, data_fim,
+        status, ordem, is_padrao, created_at;
+        """,
+        [nome, str(tarefa_id), str(cronograma_id)],
+    )
+
+    tarefa = cursor.fetchone()
+
+    if not tarefa:
+        cursor.close()
+        raise HTTPException(404, "Tarefa não encontrada.")
+
+    dados.commit()
+    cursor.close()
+    return tarefa
+
+
+# Excluir tarefa de Gantt independente, exceto padrão.
+@router.delete("/{cronograma_id}/tarefas/{tarefa_id}", status_code=204)
+def excluir_tarefa_gantt(
+    cronograma_id: UUID,
+    tarefa_id: UUID,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    verificar_cronograma_independente(
+        cursor, cronograma_id, usuario["id"]
+    )
+
+    cursor.execute(
+        """
+        SELECT is_padrao
+        FROM tarefas_cronograma
+        WHERE id = %s AND cronograma_id = %s;
+        """,
+        [str(tarefa_id), str(cronograma_id)],
+    )
+
+    tarefa = cursor.fetchone()
+
+    if not tarefa:
+        cursor.close()
+        raise HTTPException(404, "Tarefa não encontrada.")
+
+    if tarefa["is_padrao"]:
+        cursor.close()
+        raise HTTPException(400, "A tarefa padrão não pode ser excluída.")
+
+    cursor.execute(
+        """
+        DELETE FROM tarefas_cronograma
+        WHERE id = %s AND cronograma_id = %s;
+        """,
+        [str(tarefa_id), str(cronograma_id)],
+    )
+
+    dados.commit()
+    cursor.close()
+    return None

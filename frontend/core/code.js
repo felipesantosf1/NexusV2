@@ -778,6 +778,8 @@ ativarEdicaoDuploClique(
     }
 );
 
+// O nome do Gantt sempre é salvo no cronograma,
+// independentemente de ele estar vinculado ou não.
 ativarEdicaoDuploClique(
     tituloGanttEditavel,
 
@@ -792,63 +794,27 @@ ativarEdicaoDuploClique(
             throw new Error("Nenhum gráfico foi selecionado.");
         }
 
-        // gráficos vinculados mantêm o nome sincronizado
-        // com a matriz; gráficos independentes alteram seu próprio nome.
-        if (grafico.matriz_id) {
-            await requisicaoApi(`/matrizes/${grafico.matriz_id}`, {
+        const atualizado = await requisicaoApi(
+            `/cronogramas/${grafico.id}`,
+            {
                 method: "PUT",
                 body: JSON.stringify({ nome })
-            });
-        } else {
-            await requisicaoApi(`/cronogramas/${grafico.id}`, {
-                method: "PUT",
-                body: JSON.stringify({ nome })
-            });
-        }
+            }
+        );
+
+        // Atualiza os dados em memória sem modificar a matriz.
+        grafico.nome = atualizado.nome;
     },
 
     async nome => {
         const seletor = document.getElementById("ganttSelect");
+        const opcao = seletor.selectedOptions[0];
 
-        const grafico = cronogramasUsuario.find(
-            item => String(item.id) === String(seletor.value)
-        );
-
-        if (!grafico) return;
-
-        // atualiza o nome na lista de matrizes quando
-        // o gráfico está vinculado à matriz correspondente.
-        if (grafico.matriz_id) {
-            const opcaoMatriz = Array.from(seletorMatriz.options).find(
-                opcao =>
-                    String(opcao.value) === String(grafico.matriz_id)
-            );
-
-            if (opcaoMatriz) {
-                opcaoMatriz.textContent = nome;
-            }
-
-            if (String(matrizAtualId) === String(grafico.matriz_id)) {
-                tituloMatriz.textContent = nome;
-            }
+        if (opcao) {
+            opcao.textContent = nome;
         }
 
-        // recarrega os dados e atualiza o título exibido.
-        const graficoId = String(grafico.id);
-
-        await atualizarEstadoMenuMatriz();
-
-        const seletorAtualizado = document.getElementById("ganttSelect");
-
-        if (
-            Array.from(seletorAtualizado.options).some(
-                opcao => String(opcao.value) === graficoId
-            )
-        ) {
-            seletorAtualizado.value = graficoId;
-        }
-
-        atualizarEstadoMenuGrafico();
+        // Re-renderiza usando o nome já atualizado.
         await renderizarGanttVinculado();
     }
 );
@@ -899,23 +865,26 @@ async function adicionarTarefa(event) {
     }
 }
 
+// Funciona para Gantt independente ou vinculado.
 async function adicionarTarefaGantt(event) {
-    // Compara os IDs como texto para evitar incompatibilidade de tipos.
+    const seletor = document.getElementById("ganttSelect");
+
     const cronograma = cronogramasUsuario.find(
-        item => String(item.id) === String(document.getElementById("ganttSelect").value)
+        item => String(item.id) === String(seletor.value)
     );
 
-    if (!cronograma?.matriz_id) {
-        showToast(
-            "Vincule o cronograma a uma matriz antes de adicionar tarefas."
-        );
+    if (!cronograma) {
+        showToast("Crie ou selecione um gráfico primeiro.");
         return;
     }
 
-    // Campo personalizado junto ao botão Nova tarefa.
+    const vinculado = Boolean(cronograma.matriz_id);
+
     const nome = await abrirDialogoNexus({
         titulo: "Nova tarefa no Gantt",
-        descricao: "A tarefa será adicionada à matriz vinculada a este gráfico.",
+        descricao: vinculado
+            ? "A tarefa também fará parte da matriz RACIS vinculada."
+            : "Adicione uma tarefa diretamente a este cronograma.",
         rotulo: "Nome da tarefa",
         placeholder: "Digite o nome da tarefa",
         textoConfirmar: "Adicionar",
@@ -930,17 +899,31 @@ async function adicionarTarefaGantt(event) {
     }
 
     try {
-        await requisicaoApi(
-            `/matrizes/${cronograma.matriz_id}/tarefas-raci`,
-            {
-                method: "POST",
-                body: JSON.stringify({ nome: nome.trim() })
-            }
-        );
+        if (vinculado) {
+            // Gráfico vinculado: tarefa pertence à matriz RACIS.
+            await requisicaoApi(
+                `/matrizes/${cronograma.matriz_id}/tarefas-raci`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ nome: nome.trim() })
+                }
+            );
 
-        await carregarDadosRaci(cronograma.matriz_id);
+            await carregarDadosRaci(cronograma.matriz_id);
+        } else {
+            // Gráfico independente: tarefa pertence ao cronograma.
+            await requisicaoApi(
+                `/cronogramas/${cronograma.id}/tarefas`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ nome: nome.trim() })
+                }
+            );
 
-        showToast("Tarefa adicionada à matriz e ao cronograma.");
+            await renderizarGanttVinculado();
+        }
+
+        showToast("Tarefa criada.");
     } catch (error) {
         showToast(`Erro ao criar tarefa: ${error.message}`);
     }
@@ -1505,11 +1488,111 @@ async function renderizarGanttVinculado() {
         return;
     }
 
+    // NOVO: carrega tarefas próprias quando o Gantt é independente.
     if (!cronograma.matriz_id) {
-        adicionarLinhaVazia(
-            "Nenhuma matriz vinculada",
-            "Cronograma independente"
-        );
+        let tarefasIndependentes;
+
+        try {
+            tarefasIndependentes = await requisicaoApi(
+                `/cronogramas/${cronograma.id}/tarefas`
+            );
+        } catch (error) {
+            if (versao !== versaoRenderGantt) return;
+
+            console.error("Erro ao carregar tarefas do Gantt:", error);
+            adicionarLinhaVazia(
+                "Erro ao carregar tarefas",
+                "Tente novamente"
+            );
+            return;
+        }
+
+        if (versao !== versaoRenderGantt) return;
+
+        if (!tarefasIndependentes.length) {
+            adicionarLinhaVazia(
+                "Nenhuma tarefa cadastrada",
+                "Use Nova tarefa para adicionar"
+            );
+            return;
+        }
+
+        tarefasIndependentes.forEach((tarefa, indice) => {
+            const linha = document.createElement("div");
+            linha.className = "gantt-task-row";
+
+            const grupo = document.createElement("span");
+
+            const numero = document.createElement("b");
+            numero.textContent = String(indice + 1).padStart(2, "0");
+
+            const nomeTarefa = document.createElement("span");
+            nomeTarefa.textContent = tarefa.nome;
+            nomeTarefa.title = "Dê dois cliques para renomear";
+
+            grupo.append(numero, nomeTarefa);
+            linha.appendChild(grupo);
+
+            const acoes = document.createElement("div");
+            acoes.className = "gantt-task-row-actions";
+
+            const status = document.createElement("small");
+            status.textContent = tarefa.status || "Pendente";
+            acoes.appendChild(status);
+
+            const botaoExcluir = document.createElement("button");
+            botaoExcluir.type = "button";
+            botaoExcluir.className = "gantt-task-delete";
+            botaoExcluir.title = tarefa.is_padrao
+                ? "A tarefa padrão não pode ser excluída."
+                : "Excluir tarefa";
+            botaoExcluir.setAttribute("aria-label", botaoExcluir.title);
+            botaoExcluir.disabled = Boolean(tarefa.is_padrao);
+            botaoExcluir.innerHTML =
+                '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
+
+            botaoExcluir.addEventListener("click", async () => {
+                if (tarefa.is_padrao) return;
+
+                if (!confirm(`Excluir a tarefa "${tarefa.nome}"?`)) return;
+
+                try {
+                    await requisicaoApi(
+                        `/cronogramas/${cronograma.id}/tarefas/${tarefa.id}`,
+                        { method: "DELETE" }
+                    );
+
+                    await renderizarGanttVinculado();
+                    showToast("Tarefa excluída.");
+                } catch (error) {
+                    showToast(`Erro ao excluir tarefa: ${error.message}`);
+                }
+            });
+
+            acoes.appendChild(botaoExcluir);
+            linha.appendChild(acoes);
+            colunaTarefas.appendChild(linha);
+
+            const linhaTempo = document.createElement("div");
+            linhaTempo.className = "gantt-grid-row";
+            timeline.appendChild(linhaTempo);
+
+            // ALTERADO: salva o nome e atualiza a linha imediatamente.
+            ativarEdicaoDuploClique(
+                nomeTarefa,
+                async novoNome => {
+                    await requisicaoApi(
+                        `/cronogramas/${cronograma.id}/tarefas/${tarefa.id}`,
+                        {
+                            method: "PUT",
+                            body: JSON.stringify({ nome: novoNome })
+                        }
+                    );
+                },
+                async () => renderizarGanttVinculado()
+            );
+        });
+
         return;
     }
 
@@ -1568,9 +1651,50 @@ async function renderizarGanttVinculado() {
         grupo.append(numero, nomeTarefa);
         linha.appendChild(grupo);
 
+        // Agrupa o status e o botão de exclusão.
+        const acoes = document.createElement("div");
+        acoes.className = "gantt-task-row-actions";
+
         const status = document.createElement("small");
-        status.textContent = "Sem datas";
-        linha.appendChild(status);
+        status.textContent = tarefa.status || "Sem datas";
+        acoes.appendChild(status);
+
+        const botaoExcluir = document.createElement("button");
+        botaoExcluir.type = "button";
+        botaoExcluir.className = "gantt-task-delete";
+        botaoExcluir.disabled = Boolean(tarefa.is_padrao);
+        botaoExcluir.title = tarefa.is_padrao
+            ? "A tarefa padrão não pode ser excluída."
+            : "Excluir tarefa";
+        botaoExcluir.setAttribute("aria-label", botaoExcluir.title);
+        botaoExcluir.innerHTML =
+            '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
+
+        botaoExcluir.addEventListener("click", async () => {
+            if (tarefa.is_padrao) return;
+
+            if (!confirm(`Excluir a tarefa "${tarefa.nome}"?`)) return;
+
+            try {
+                await requisicaoApi(
+                    `/matrizes/${cronograma.matriz_id}/tarefas-raci/${tarefa.id}`,
+                    { method: "DELETE" }
+                );
+
+                if (String(matrizAtualId) === String(cronograma.matriz_id)) {
+                    await carregarDadosRaci(cronograma.matriz_id);
+                } else {
+                    await renderizarGanttVinculado();
+                }
+
+                showToast("Tarefa excluída.");
+            } catch (error) {
+                showToast(`Erro ao excluir tarefa: ${error.message}`);
+            }
+        });
+
+        acoes.appendChild(botaoExcluir);
+        linha.appendChild(acoes);
 
         colunaTarefas.appendChild(linha);
 
