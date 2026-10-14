@@ -1444,6 +1444,10 @@ async function renderizarGanttVinculado() {
 
         const linhaTempo = document.createElement("div");
         linhaTempo.className = "gantt-grid-row";
+
+        // Alinha a grade à altura da tarefa correspondente.
+        linhaTempo.style.height = `${linha.offsetHeight}px`;
+
         timeline.appendChild(linhaTempo);
     }
 
@@ -1584,6 +1588,10 @@ async function renderizarGanttVinculado() {
 
             const linhaTempo = document.createElement("div");
             linhaTempo.className = "gantt-grid-row";
+
+            // Alinha a grade à altura da tarefa correspondente.
+            linhaTempo.style.height = `${linha.offsetHeight}px`;
+
             timeline.appendChild(linhaTempo);
 
             // ALTERADO: salva o nome e atualiza a linha imediatamente.
@@ -1650,13 +1658,15 @@ async function renderizarGanttVinculado() {
         linha.className = "gantt-task-row";
 
         const grupo = document.createElement("span");
+        grupo.className = "gantt-task-name-group";
 
         const numero = document.createElement("b");
         numero.textContent = String(indice + 1).padStart(2, "0");
 
         const nomeTarefa = document.createElement("span");
+        nomeTarefa.className = "gantt-task-name";
         nomeTarefa.textContent = tarefa.nome;
-        nomeTarefa.title = "Dê dois cliques para renomear";
+        nomeTarefa.title = `${tarefa.nome}\nDê dois cliques para renomear`;
 
         grupo.append(numero, nomeTarefa);
         linha.appendChild(grupo);
@@ -1711,6 +1721,10 @@ async function renderizarGanttVinculado() {
         // Uma linha temporal correspondente a cada tarefa.
         const linhaTempo = document.createElement("div");
         linhaTempo.className = "gantt-grid-row";
+
+        // Alinha a grade à altura da tarefa correspondente.
+        linhaTempo.style.height = `${linha.offsetHeight}px`;
+
         timeline.appendChild(linhaTempo);
 
         // Renomear no Gantt também altera a tarefa da matriz.

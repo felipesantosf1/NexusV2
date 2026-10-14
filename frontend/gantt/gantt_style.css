@@ -171,7 +171,6 @@
     overflow: hidden;
 }
 
-/* NOVO: evita que o campo de edição seja reduzido a "...". */
 .gantt-task-name-group .raci-inline-edit {
     flex: 1 1 120px;
     width: 100%;
@@ -180,4 +179,49 @@
     box-sizing: border-box;
     overflow: visible;
     text-overflow: clip;
+}
+
+/* #ALTERADO: permite que as linhas do Gantt cresçam com nomes longos. */
+.gantt-task-row {
+    height: auto;
+    min-height: 55px;
+}
+
+/* #ALTERADO: mantém o nome completo visível, sem reticências. */
+.gantt-task-row .gantt-task-name-group {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+}
+
+.gantt-task-row .gantt-task-name-group > .gantt-task-name {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.4;
+}
+
+/* #ALTERADO: mantém o campo de edição utilizável dentro da linha. */
+.gantt-task-row .gantt-task-name-group > .raci-inline-edit {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+}
+
+/* #ALTERADO: permite ajustar a altura da grade ao lado das tarefas. */
+.gantt-grid-row {
+    height: auto;
+    min-height: 55px;
 }
