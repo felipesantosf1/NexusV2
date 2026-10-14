@@ -14,6 +14,8 @@ router = APIRouter(prefix="/cronogramas", tags=["Cronogramas"])
 class CronogramaCriacao(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
 
+class CronogramaAtualizacao(BaseModel):
+    nome: str = Field(min_length=1, max_length=100)
 
 class VinculoCronograma(BaseModel):
     matriz_id: UUID | None = None
@@ -68,6 +70,41 @@ def criar_cronograma(
     cursor.close()
     return cronograma
 
+# ALTERADO: permite renomear um gráfico Gantt independente.
+@router.put("/{cronograma_id}")
+def atualizar_cronograma(
+    cronograma_id: UUID,
+    entrada: CronogramaAtualizacao,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    nome = entrada.nome.strip()
+
+    if not nome:
+        raise HTTPException(400, "Informe o nome do cronograma.")
+
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute(
+        """
+        UPDATE cronogramas
+        SET nome = %s
+        WHERE id = %s AND usuario_id = %s
+        RETURNING id, usuario_id, matriz_id, nome, created_at;
+        """,
+        [nome, str(cronograma_id), str(usuario["id"])],
+    )
+
+    cronograma = cursor.fetchone()
+
+    if not cronograma:
+        cursor.close()
+        raise HTTPException(404, "Gráfico não encontrado.")
+
+    dados.commit()
+    cursor.close()
+
+    return cronograma
 
 @router.put("/{cronograma_id}/vinculo")
 def atualizar_vinculo(
