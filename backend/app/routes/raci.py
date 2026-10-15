@@ -7,15 +7,21 @@ from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
-from app.database import get_db
 
-from app.auth import get_current_user
+from app.database import get_db
+from datetime import date
 
 router = APIRouter(tags=["Matriz RACIS"])
 
 
 class NomeEntrada(BaseModel):
     nome: str = Field(min_length=1, max_length=150)
+
+
+class PlanejamentoTarefaEntrada(BaseModel):
+    data_inicio: date | None = None
+    data_fim: date | None = None
+    status: Literal["pending", "in_progress", "done"] = "pending"
 
 
 class AtribuicaoEntrada(BaseModel):
@@ -96,7 +102,10 @@ def listar_dados_raci(
 
     cursor.execute(
         """
-        SELECT id, matriz_id, nome, ordem, is_padrao, created_at
+        SELECT
+            id, matriz_id, nome, ordem,
+            data_inicio, data_fim, status,
+            is_padrao, created_at
         FROM tarefas_raci
         WHERE matriz_id = %s
         ORDER BY ordem, created_at;
@@ -105,9 +114,11 @@ def listar_dados_raci(
     )
     tarefas = cursor.fetchall()
 
+    # Consulta os membros na tabela correta.
     cursor.execute(
         """
-        SELECT id, matriz_id, nome, ordem, is_padrao, created_at
+        SELECT
+            id, matriz_id, nome, ordem, is_padrao, created_at
         FROM membros
         WHERE matriz_id = %s
         ORDER BY ordem, created_at;
@@ -116,6 +127,7 @@ def listar_dados_raci(
     )
     membros = cursor.fetchall()
 
+    # Consulta as atribuições na tabela correta.
     cursor.execute(
         """
         SELECT matriz_id, tarefa_id, membro_id, papel, created_at
@@ -212,6 +224,66 @@ def editar_tarefa_raci(
     cursor.close()
     return tarefa
 
+
+# Atualiza prazo e status de uma tarefa RACIS.
+@router.patch(
+    "/matrizes/{matriz_id}/tarefas-raci/{tarefa_id}/planejamento"
+)
+def atualizar_planejamento_raci(
+    matriz_id: UUID,
+    tarefa_id: UUID,
+    entrada: PlanejamentoTarefaEntrada,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    if (entrada.data_inicio is None) != (entrada.data_fim is None):
+        raise HTTPException(
+            400,
+            "Preencha as duas datas ou deixe ambas vazias.",
+        )
+
+    if (
+        entrada.data_inicio is not None
+        and entrada.data_fim < entrada.data_inicio
+    ):
+        raise HTTPException(
+            400,
+            "A data final deve ser igual ou posterior à data inicial.",
+        )
+
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+    verificar_matriz(cursor, matriz_id, usuario["id"])
+
+    cursor.execute(
+        """
+        UPDATE tarefas_raci
+        SET data_inicio = %s,
+            data_fim = %s,
+            status = %s
+        WHERE id = %s AND matriz_id = %s
+        RETURNING
+            id, matriz_id, nome, ordem,
+            data_inicio, data_fim, status,
+            is_padrao, created_at;
+        """,
+        [
+            entrada.data_inicio,
+            entrada.data_fim,
+            entrada.status,
+            str(tarefa_id),
+            str(matriz_id),
+        ],
+    )
+
+    tarefa = cursor.fetchone()
+
+    if not tarefa:
+        cursor.close()
+        raise HTTPException(404, "Tarefa não encontrada.")
+
+    dados.commit()
+    cursor.close()
+    return tarefa
 
 # Excluir tarefa, exceto se for padrão
 @router.delete(

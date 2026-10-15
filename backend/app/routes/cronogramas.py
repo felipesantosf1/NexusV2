@@ -1,9 +1,11 @@
-
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
+
+from datetime import date
+from typing import Literal
 
 from app.auth import get_current_user
 from app.database import get_db
@@ -16,6 +18,12 @@ class CronogramaCriacao(BaseModel):
 
 class CronogramaAtualizacao(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
+
+# dados de prazo e status das tarefas do Gantt independente.
+class PlanejamentoTarefaAtualizacao(BaseModel):
+    data_inicio: date | None = None
+    data_fim: date | None = None
+    status: Literal["pending", "in_progress", "done"] = "pending"
 
 class VinculoCronograma(BaseModel):
     matriz_id: UUID | None = None
@@ -437,3 +445,64 @@ def excluir_tarefa_gantt(
     dados.commit()
     cursor.close()
     return None
+
+
+# Atualizar datas e status de uma tarefa independente.
+@router.patch("/{cronograma_id}/tarefas/{tarefa_id}/planejamento")
+def atualizar_planejamento_gantt(
+    cronograma_id: UUID,
+    tarefa_id: UUID,
+    entrada: PlanejamentoTarefaAtualizacao,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    if (entrada.data_inicio is None) != (entrada.data_fim is None):
+        raise HTTPException(
+            400,
+            "Preencha as duas datas ou deixe ambas vazias.",
+        )
+
+    if (
+        entrada.data_inicio is not None
+        and entrada.data_fim < entrada.data_inicio
+    ):
+        raise HTTPException(
+            400,
+            "A data final deve ser igual ou posterior à data inicial.",
+        )
+
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    verificar_cronograma_independente(
+        cursor, cronograma_id, usuario["id"]
+    )
+
+    cursor.execute(
+        """
+        UPDATE tarefas_cronograma
+        SET data_inicio = %s,
+            data_fim = %s,
+            status = %s
+        WHERE id = %s AND cronograma_id = %s
+        RETURNING
+            id, cronograma_id, nome, data_inicio, data_fim,
+            status, ordem, is_padrao, created_at;
+        """,
+        [
+            entrada.data_inicio,
+            entrada.data_fim,
+            entrada.status,
+            str(tarefa_id),
+            str(cronograma_id),
+        ],
+    )
+
+    tarefa = cursor.fetchone()
+
+    if not tarefa:
+        cursor.close()
+        raise HTTPException(404, "Tarefa não encontrada.")
+
+    dados.commit()
+    cursor.close()
+    return tarefa

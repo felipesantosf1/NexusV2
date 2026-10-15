@@ -1382,6 +1382,251 @@ async function exportarGraficoExcel() {
     XLSX.writeFile(livro, `${nomeArquivo}.xlsx`);
 }
 
+// Converte o valor salvo para um status conhecido.
+function normalizarStatusGantt(status) {
+    const valor = String(status || "pending").toLowerCase();
+
+    if (["done", "completed", "concluída", "concluida"].includes(valor)) {
+        return "done";
+    }
+
+    if (["in_progress", "em andamento", "andamento"].includes(valor)) {
+        return "in_progress";
+    }
+
+    return "pending";
+}
+
+// Rótulos em português para o seletor e as linhas.
+function rotuloStatusGantt(status) {
+    const valor = normalizarStatusGantt(status);
+
+    if (valor === "done") return "Concluída";
+    if (valor === "in_progress") return "Em andamento";
+
+    return "Pendente";
+}
+
+// Cria uma linha de duração posicionada na escala JAN–DEZ.
+function adicionarBarraDataGantt(linhaTempo, tarefa) {
+    if (!tarefa.data_inicio || !tarefa.data_fim) return;
+
+    const [anoInicio, mesInicio, diaInicio] =
+        tarefa.data_inicio.split("-").map(Number);
+
+    const [anoFim, mesFim, diaFim] =
+        tarefa.data_fim.split("-").map(Number);
+
+    const inicio = Date.UTC(anoInicio, mesInicio - 1, diaInicio);
+    const fim = Date.UTC(anoFim, mesFim - 1, diaFim);
+
+    if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio) {
+        return;
+    }
+
+    const inicioAno = Date.UTC(anoInicio, 0, 1);
+    const proximoAno = Date.UTC(anoInicio + 1, 0, 1);
+    const diasNoAno = (proximoAno - inicioAno) / 86400000;
+
+    // A escala atual do gráfico exibe janeiro a dezembro.
+    if (inicio >= proximoAno) return;
+
+    // Se o prazo passar do fim do ano, a barra é cortada em dezembro.
+    const fimVisivel = Math.min(fim, proximoAno);
+
+    const esquerda = ((inicio - inicioAno) / 86400000) / diasNoAno * 100;
+    let direita = ((fimVisivel - inicioAno) / 86400000) / diasNoAno * 100;
+
+    // Uma tarefa que começa e termina no mesmo dia ainda terá uma barra.
+    if (direita <= esquerda) {
+        direita = esquerda + (100 / diasNoAno);
+    }
+
+    direita = Math.min(100, direita);
+
+    const barra = document.createElement("span");
+    const status = normalizarStatusGantt(tarefa.status);
+
+    barra.className = `gantt-date-bar bar-${{
+        done: "done",
+        in_progress: "progress",
+        pending: "pending"
+    }[status]}`;
+
+    barra.style.left = `${esquerda}%`;
+    barra.style.width = `${Math.max(0, direita - esquerda)}%`;
+
+    barra.title =
+        `${tarefa.nome}: ${formatarDataGantt(tarefa.data_inicio)} a ` +
+        `${formatarDataGantt(tarefa.data_fim)} — ${rotuloStatusGantt(status)}`;
+
+    barra.setAttribute("aria-label", barra.title);
+
+    linhaTempo.appendChild(barra);
+}
+
+// Apresenta as datas no formato brasileiro.
+function formatarDataGantt(data) {
+    if (!data) return "Sem data";
+
+    const [ano, mes, dia] = data.split("-");
+    return `${dia}/${mes}/${ano}`;
+}
+
+// Abre o editor de datas e status da tarefa.
+function abrirEditorPlanejamentoGantt(tarefa) {
+    return new Promise(resolve => {
+        const dialogo = document.createElement("dialog");
+        dialogo.className = "gantt-schedule-dialog";
+
+        dialogo.innerHTML = `
+            <form class="gantt-schedule-form">
+                <h2>Planejamento da tarefa</h2>
+
+                <label>
+                    Data inicial
+                    <input type="date" name="data_inicio">
+                </label>
+
+                <label>
+                    Data final
+                    <input type="date" name="data_fim">
+                </label>
+
+                <label>
+                    Status
+                    <select name="status">
+                        <option value="pending">Pendente</option>
+                        <option value="in_progress">Em andamento</option>
+                        <option value="done">Concluída</option>
+                    </select>
+                </label>
+
+                <p class="gantt-schedule-error" hidden></p>
+
+                <div class="gantt-schedule-actions">
+                    <button type="button" class="button secondary-button">
+                        Cancelar
+                    </button>
+
+                    <button type="submit" class="button primary-button">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        `;
+
+        document.body.appendChild(dialogo);
+
+        const formulario = dialogo.querySelector("form");
+        const inicio = formulario.elements.data_inicio;
+        const fim = formulario.elements.data_fim;
+        const status = formulario.elements.status;
+        const erro = dialogo.querySelector(".gantt-schedule-error");
+
+        inicio.value = tarefa.data_inicio || "";
+        fim.value = tarefa.data_fim || "";
+        status.value = normalizarStatusGantt(tarefa.status);
+
+        let finalizado = false;
+
+        function finalizar(resultado) {
+            if (finalizado) return;
+
+            finalizado = true;
+
+            if (dialogo.open) dialogo.close();
+            dialogo.remove();
+
+            resolve(resultado);
+        }
+
+        formulario.querySelector(
+            'button[type="button"]'
+        ).addEventListener("click", () => finalizar(null));
+
+        dialogo.addEventListener("cancel", event => {
+            event.preventDefault();
+            finalizar(null);
+        });
+
+        formulario.addEventListener("submit", event => {
+            event.preventDefault();
+
+            if (Boolean(inicio.value) !== Boolean(fim.value)) {
+                erro.textContent = "Preencha as duas datas ou deixe ambas vazias.";
+                erro.hidden = false;
+                return;
+            }
+
+            if (inicio.value && fim.value < inicio.value) {
+                erro.textContent = "A data final deve ser igual ou posterior à inicial.";
+                erro.hidden = false;
+                return;
+            }
+
+            finalizar({
+                data_inicio: inicio.value || null,
+                data_fim: fim.value || null,
+                status: status.value
+            });
+        });
+
+        dialogo.showModal();
+    });
+}
+
+// Salva datas/status conforme o Gantt seja independente ou vinculado.
+async function editarPlanejamentoGantt(tarefa, cronograma) {
+    const planejamento = await abrirEditorPlanejamentoGantt(tarefa);
+
+    if (!planejamento) return;
+
+    try {
+        const endpoint = cronograma.matriz_id
+            ? `/matrizes/${cronograma.matriz_id}/tarefas-raci/${tarefa.id}/planejamento`
+            : `/cronogramas/${cronograma.id}/tarefas/${tarefa.id}/planejamento`;
+
+        await requisicaoApi(endpoint, {
+            method: "PATCH",
+            body: JSON.stringify(planejamento)
+        });
+
+        tarefa.data_inicio = planejamento.data_inicio;
+        tarefa.data_fim = planejamento.data_fim;
+        tarefa.status = planejamento.status;
+
+        if (
+            cronograma.matriz_id &&
+            String(matrizAtualId) === String(cronograma.matriz_id)
+        ) {
+            await carregarDadosRaci(cronograma.matriz_id);
+        } else {
+            await renderizarGanttVinculado();
+        }
+
+        showToast("Datas e status atualizados.");
+    } catch (error) {
+        showToast(`Erro ao atualizar planejamento: ${error.message}`);
+    }
+}
+
+// Botão de calendário ao lado de cada tarefa.
+function criarBotaoPlanejamentoGantt(tarefa, cronograma) {
+    const botao = document.createElement("button");
+
+    botao.type = "button";
+    botao.className = "gantt-task-schedule";
+    botao.title = "Definir datas e status";
+    botao.setAttribute("aria-label", botao.title);
+    botao.innerHTML = '<i class="fa-regular fa-calendar-days"></i>';
+
+    botao.addEventListener("click", () => {
+        editarPlanejamentoGantt(tarefa, cronograma);
+    });
+
+    return botao;
+}
 
 async function renderizarGanttVinculado() {
     const versao = ++versaoRenderGantt;
@@ -1549,9 +1794,13 @@ async function renderizarGanttVinculado() {
             const acoes = document.createElement("div");
             acoes.className = "gantt-task-row-actions";
 
+            // Exibe status em português.
             const status = document.createElement("small");
-            status.textContent = tarefa.status || "Pendente";
+            status.textContent = rotuloStatusGantt(tarefa.status);
             acoes.appendChild(status);
+
+            // Botão para editar datas e status.
+            acoes.appendChild(criarBotaoPlanejamentoGantt(tarefa, cronograma));
 
             const botaoExcluir = document.createElement("button");
             botaoExcluir.type = "button";
@@ -1593,6 +1842,9 @@ async function renderizarGanttVinculado() {
             linhaTempo.style.height = `${linha.offsetHeight}px`;
 
             timeline.appendChild(linhaTempo);
+
+            // Desenha a barra de acordo com o intervalo definido.
+            adicionarBarraDataGantt(linhaTempo, tarefa);
 
             // ALTERADO: salva o nome e atualiza a linha imediatamente.
             ativarEdicaoDuploClique(
@@ -1675,9 +1927,13 @@ async function renderizarGanttVinculado() {
         const acoes = document.createElement("div");
         acoes.className = "gantt-task-row-actions";
 
+        // Mostra o status real da tarefa.
         const status = document.createElement("small");
-        status.textContent = tarefa.status || "Sem datas";
+        status.textContent = rotuloStatusGantt(tarefa.status);
         acoes.appendChild(status);
+
+        // Botão para editar datas e status.
+        acoes.appendChild(criarBotaoPlanejamentoGantt(tarefa, cronograma));
 
         const botaoExcluir = document.createElement("button");
         botaoExcluir.type = "button";
@@ -1726,6 +1982,8 @@ async function renderizarGanttVinculado() {
         linhaTempo.style.height = `${linha.offsetHeight}px`;
 
         timeline.appendChild(linhaTempo);
+
+        adicionarBarraDataGantt(linhaTempo, tarefa);
 
         // Renomear no Gantt também altera a tarefa da matriz.
         ativarEdicaoDuploClique(
