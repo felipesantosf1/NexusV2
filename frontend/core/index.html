@@ -38,16 +38,71 @@
 
     <main class="app-shell">
         <header class="workspace-topbar">
+            
             <div class="workspace-identity">
-                <div class="workspace-icon"><i class="fa-solid fa-people-group"></i></div>
+                <div class="workspace-icon">
+                    <i class="fa-solid fa-people-group"></i>
+                </div>
+
                 <div class="workspace-heading">
                     <span class="eyebrow">ESPAÇO DE TRABALHO</span>
-                    <button class="workspace-name" id="teamButton" type="button" title="Equipe atual">
-                        Equipe do projeto <i class="fa-solid fa-chevron-down"></i>
-                    </button>
+
+                    <div class="workspace-name-row">
+                        <span
+                            class="workspace-name-text"
+                            id="workspaceNameText"
+                            title="Dê dois cliques para renomear"
+                        >Equipe do projeto</span>
+
+                        <button
+                            class="workspace-switch-button"
+                            id="teamButton"
+                            type="button"
+                            aria-label="Trocar espaço de trabalho"
+                            aria-expanded="false"
+                            aria-controls="workspaceMenu"
+                            title="Trocar espaço de trabalho"
+                        >
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+
+                        <div
+                            class="workspace-menu hidden"
+                            id="workspaceMenu"
+                            role="menu"
+                            aria-label="Espaços de trabalho"
+                        >
+                            <div class="workspace-menu-title">
+                                Seus espaços de trabalho
+                            </div>
+
+                            <div id="workspaceList" class="workspace-list">
+                                <p class="workspace-empty">
+                                    Carregando espaços de trabalho...
+                                </p>
+                            </div>
+
+                            <div class="workspace-menu-divider"></div>
+
+                            <button
+                                type="button"
+                                class="workspace-create-option"
+                                id="createWorkspaceButton"
+                                role="menuitem"
+                            >
+                                <i class="fa-solid fa-plus"></i>
+                                <span>Criar espaço de trabalho</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <span class="workspace-pill"><i class="fa-solid fa-lock"></i> Privado</span>
+
+                <span class="workspace-pill" id="workspaceVisibilityPill">
+                    <i class="fa-solid fa-lock"></i>
+                    Privado
+                </span>
             </div>
+
 
             <div class="topbar-actions">
                 <div class="member-stack" aria-label="Integrantes do espaço de trabalho">
