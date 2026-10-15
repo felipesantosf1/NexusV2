@@ -111,84 +111,19 @@ def get_current_user(
         )
 
     supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 
-    if not supabase_url:
+    if not supabase_url or not supabase_key:
         raise HTTPException(
             status_code=500,
-            detail="SUPABASE_URL não foi configurada.",
+            detail="SUPABASE_URL ou SUPABASE_PUBLISHABLE_KEY não configurada.",
         )
 
-    token = credenciais.credentials
-
-    try:
-        cabecalho = jwt.get_unverified_header(token)
-    except InvalidTokenError as erro:
-        raise HTTPException(
-            status_code=401,
-            detail="Token inválido.",
-        ) from erro
-
-    algoritmo = cabecalho.get("alg")
-
-    # Caminho rápido: verifica localmente tokens ES256.
-    if algoritmo == "ES256":
-        try:
-            cliente = obter_cliente_jwks(supabase_url)
-
-            chave = cliente.get_signing_key_from_jwt(token).key
-
-            claims = jwt.decode(
-                token,
-                chave,
-                algorithms=["ES256"],
-                audience="authenticated",
-                issuer=f"{supabase_url.rstrip('/')}/auth/v1",
-                options={
-                    "require": ["exp", "sub", "aud", "iss"]
-                },
-            )
-
-            usuario_id = UUID(claims["sub"])
-
-            return {"id": usuario_id}
-
-        except PyJWKClientConnectionError as erro:
-            raise HTTPException(
-                status_code=503,
-                detail="Não foi possível obter as chaves de autenticação.",
-            ) from erro
-
-        except PyJWKClientError as erro:
-            raise HTTPException(
-                status_code=401,
-                detail="A chave de assinatura do token não foi encontrada.",
-            ) from erro
-
-        except (InvalidTokenError, ValueError, KeyError, TypeError) as erro:
-            raise HTTPException(
-                status_code=401,
-                detail="Sessão inválida ou expirada.",
-            ) from erro
-
-    # Compatibilidade: tokens HS256 antigos continuam sendo
-    # validados pelo Supabase, sem aceitar o algoritmo às cegas.
-    if algoritmo == "HS256":
-        supabase_key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
-
-        if not supabase_key:
-            raise HTTPException(
-                status_code=500,
-                detail="SUPABASE_PUBLISHABLE_KEY não foi configurada.",
-            )
-
-        return validar_token_legado(
-            token,
-            supabase_url,
-            supabase_key,
-        )
-
-    # Não aceitar algoritmos diferentes dos previstos.
-    raise HTTPException(
-        status_code=401,
-        detail="Algoritmo de autenticação não permitido.",
+    # O Supabase verifica o token e devolve o usuário autenticado.
+    return validar_token_legado(
+        credenciais.credentials,
+        supabase_url,
+        supabase_key,
     )
+
+    

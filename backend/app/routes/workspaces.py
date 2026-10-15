@@ -9,7 +9,7 @@ from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.workspace_context import garantir_espaco_padrao
+from app.workspace_context import (garantir_espaco_padrao, garantir_itens_padrao_workspace)
 
 
 router = APIRouter(prefix="/workspaces", tags=["Espaços de trabalho"])
@@ -127,6 +127,13 @@ def criar_workspace(
         [str(espaco["id"]), str(usuario["id"])],
     )
 
+    # Cria os itens padrão do novo espaço.
+    garantir_itens_padrao_workspace(
+        cursor,
+        espaco["id"],
+        usuario["id"],
+    )
+
     dados.commit()
     cursor.close()
 
@@ -176,6 +183,153 @@ def renomear_workspace(
     return espaco
 
 
+# EXCLUIR UM ESPAÇO DE TRABALHO
+@router.delete("/{workspace_id}", status_code=204)
+def excluir_workspace(
+    workspace_id: UUID,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    cursor.execute(
+        """
+        SELECT owner_id, is_default
+        FROM public.workspaces
+        WHERE id = %s
+        FOR UPDATE;
+        """,
+        [str(workspace_id)],
+    )
+
+    workspace = cursor.fetchone()
+
+    if not workspace:
+        cursor.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Espaço de trabalho não encontrado.",
+        )
+
+    # Somente o proprietário pode excluir o espaço.
+    if str(workspace["owner_id"]) != str(usuario["id"]):
+        cursor.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Somente o proprietário pode excluir este espaço.",
+        )
+
+    # O espaço padrão é necessário para a inicialização da conta.
+    if workspace["is_default"]:
+        cursor.close()
+        raise HTTPException(
+            status_code=400,
+            detail="O espaço de trabalho padrão não pode ser excluído.",
+        )
+
+    workspace_id_str = str(workspace_id)
+
+    try:
+        # Remove os convites do espaço.
+        cursor.execute(
+            """
+            DELETE FROM public.workspace_invites
+            WHERE workspace_id = %s;
+            """,
+            [workspace_id_str],
+        )
+
+        # Remove as atribuições, tarefas e membros das matrizes.
+        cursor.execute(
+            """
+            DELETE FROM public.atribuicoes_raci
+            WHERE matriz_id IN (
+                SELECT id FROM public.matrizes
+                WHERE workspace_id = %s
+            );
+            """,
+            [workspace_id_str],
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM public.tarefas_raci
+            WHERE matriz_id IN (
+                SELECT id FROM public.matrizes
+                WHERE workspace_id = %s
+            );
+            """,
+            [workspace_id_str],
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM public.membros
+            WHERE matriz_id IN (
+                SELECT id FROM public.matrizes
+                WHERE workspace_id = %s
+            );
+            """,
+            [workspace_id_str],
+        )
+
+        # Remove as tarefas dos cronogramas independentes.
+        cursor.execute(
+            """
+            DELETE FROM public.tarefas_cronograma
+            WHERE cronograma_id IN (
+                SELECT id FROM public.cronogramas
+                WHERE workspace_id = %s
+            );
+            """,
+            [workspace_id_str],
+        )
+
+        # Remove os cronogramas antes das matrizes vinculadas.
+        cursor.execute(
+            """
+            DELETE FROM public.cronogramas
+            WHERE workspace_id = %s;
+            """,
+            [workspace_id_str],
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM public.matrizes
+            WHERE workspace_id = %s;
+            """,
+            [workspace_id_str],
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM public.workspace_members
+            WHERE workspace_id = %s;
+            """,
+            [workspace_id_str],
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM public.workspaces
+            WHERE id = %s;
+            """,
+            [workspace_id_str],
+        )
+
+        dados.commit()
+
+    except Exception:
+        dados.rollback()
+        raise
+
+    finally:
+        cursor.close()
+
+    return None
+
+
 # Consultar integrantes de um espaço.
 @router.get("/{workspace_id}/members")
 def listar_integrantes(
@@ -193,12 +347,13 @@ def listar_integrantes(
             wm.usuario_id,
             wm.papel,
             wm.created_at,
-            u.email,
-            COALESCE(
-                NULLIF(u.raw_user_meta_data->>'full_name', ''),
-                NULLIF(u.raw_user_meta_data->>'name', ''),
-                split_part(u.email, '@', 1)
-            ) AS nome
+            u.email,  
+        COALESCE(
+            NULLIF(u.raw_user_meta_data->>'full_name', ''),
+            NULLIF(u.raw_user_meta_data->>'name', ''),
+            NULLIF(u.raw_user_meta_data->>'username', ''),
+            split_part(u.email, '@', 1)
+        ) AS nome
         FROM public.workspace_members AS wm
         JOIN auth.users AS u
             ON u.id = wm.usuario_id

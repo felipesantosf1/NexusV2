@@ -1069,6 +1069,7 @@ function atualizarCabecalhoWorkspace() {
         : '<i class="fa-solid fa-lock"></i> Privado';
 }
 
+
 function renderizarListaWorkspaces() {
     workspaceList.replaceChildren();
 
@@ -1081,6 +1082,9 @@ function renderizarListaWorkspaces() {
     }
 
     workspacesUsuario.forEach(workspace => {
+        const linha = document.createElement("div");
+        linha.className = "workspace-option-row";
+
         const botao = document.createElement("button");
         botao.type = "button";
         botao.className = "workspace-option";
@@ -1094,7 +1098,8 @@ function renderizarListaWorkspaces() {
 
         const indicador = document.createElement("i");
         indicador.className = "fa-solid fa-check";
-        indicador.hidden = String(workspace.id) !== String(workspaceAtualId);
+        indicador.hidden =
+            String(workspace.id) !== String(workspaceAtualId);
 
         if (String(workspace.id) === String(workspaceAtualId)) {
             botao.classList.add("active");
@@ -1112,14 +1117,110 @@ function renderizarListaWorkspaces() {
             try {
                 await selecionarWorkspace(workspace.id);
             } catch (error) {
-                console.error("Erro ao trocar espaço de trabalho:", error);
-                showToast(`Não foi possível trocar de espaço: ${error.message}`);
+                console.error("Erro ao trocar espaço:", error);
+                showToast(
+                    `Não foi possível trocar de espaço: ${error.message}`
+                );
             }
         });
 
-        workspaceList.appendChild(botao);
+        linha.appendChild(botao);
+
+        // Somente o proprietário pode excluir espaços que não sejam padrão.
+        if (workspace.papel === "owner" && !workspace.is_default) {
+            const excluir = document.createElement("button");
+            excluir.type = "button";
+            excluir.className = "workspace-delete-button";
+            excluir.title = `Excluir ${workspace.nome}`;
+            excluir.setAttribute(
+                "aria-label",
+                `Excluir espaço ${workspace.nome}`
+            );
+            excluir.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+            excluir.addEventListener("click", async event => {
+                event.stopPropagation();
+                fecharMenuWorkspace();
+                await excluirWorkspace(workspace);
+            });
+
+            linha.appendChild(excluir);
+        }
+
+        workspaceList.appendChild(linha);
     });
 }
+
+
+async function excluirWorkspace(workspace) {
+    if (!workspace || workspace.is_default) {
+        showToast("O espaço de trabalho padrão não pode ser excluído.");
+        return;
+    }
+
+    if (workspace.papel !== "owner") {
+        showToast("Somente o proprietário pode excluir este espaço.");
+        return;
+    }
+
+    const confirmado = confirm(
+        `Deseja excluir o espaço "${workspace.nome}"?\n\n` +
+        "Todas as matrizes, tarefas, cronogramas, integrantes e convites " +
+        "associados serão removidos permanentemente. Esta ação não pode " +
+        "ser desfeita."
+    );
+
+    if (!confirmado) return;
+
+    const eraAtual =
+        String(workspace.id) === String(workspaceAtualId);
+
+    try {
+        await requisicaoApi(`/workspaces/${workspace.id}`, {
+            method: "DELETE"
+        });
+
+        if (eraAtual) {
+            try {
+                localStorage.removeItem("nexus_workspace_id");
+            } catch (error) {
+                console.warn(
+                    "Não foi possível limpar o espaço salvo:",
+                    error
+                );
+            }
+
+            // Recarrega os espaços e seleciona o padrão após a exclusão.
+            workspacesUsuario = await requisicaoApi("/workspaces/");
+
+            const proximo =
+                workspacesUsuario.find(item => item.is_default) ||
+                workspacesUsuario[0];
+
+            if (!proximo) {
+                throw new Error(
+                    "Nenhum espaço de trabalho está disponível."
+                );
+            }
+
+            await selecionarWorkspace(proximo.id);
+        } else {
+            workspacesUsuario = workspacesUsuario.filter(
+                item => String(item.id) !== String(workspace.id)
+            );
+
+            renderizarListaWorkspaces();
+        }
+
+        showToast("Espaço de trabalho excluído.");
+    } catch (error) {
+        console.error("Erro ao excluir espaço:", error);
+        showToast(
+            `Não foi possível excluir o espaço: ${error.message}`
+        );
+    }
+}
+
 
 function renderizarMembrosWorkspace() {
     if (!memberStack) return;

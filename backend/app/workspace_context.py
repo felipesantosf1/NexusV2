@@ -7,6 +7,128 @@ from psycopg2.extras import RealDictCursor
 from app.auth import get_current_user
 from app.database import get_db
 
+# GARANTIR OS ITENS PADRÃO DE CADA ESPAÇO
+def garantir_itens_padrao_workspace(cursor, workspace_id, usuario_id):
+    # Busca a matriz padrão do espaço.
+    cursor.execute(
+        """
+        SELECT id
+        FROM public.matrizes
+        WHERE workspace_id = %s
+        AND is_padrao = TRUE
+        ORDER BY created_at ASC
+        LIMIT 1;
+        """,
+        [str(workspace_id)],
+    )
+
+    matriz = cursor.fetchone()
+
+    # Cria a matriz padrão quando ela ainda não existe.
+    if not matriz:
+        cursor.execute(
+            """
+            INSERT INTO public.matrizes
+                (nome, usuario_id, workspace_id, is_padrao)
+            VALUES (%s, %s, %s, TRUE)
+            RETURNING id;
+            """,
+            [
+                "Matriz Padrão",
+                str(usuario_id),
+                str(workspace_id),
+            ],
+        )
+
+        matriz = cursor.fetchone()
+
+    matriz_id = matriz["id"]
+
+    # Cria a tarefa padrão da matriz, se necessário.
+    cursor.execute(
+        """
+        INSERT INTO public.tarefas_raci
+            (matriz_id, nome, ordem, is_padrao)
+        SELECT %s, 'Tarefa Padrão', 0, TRUE
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.tarefas_raci
+            WHERE matriz_id = %s
+            AND is_padrao = TRUE
+        );
+        """,
+        [str(matriz_id), str(matriz_id)],
+    )
+
+    # Cria o membro padrão da matriz, se necessário.
+    cursor.execute(
+        """
+        INSERT INTO public.membros
+            (matriz_id, nome, ordem, is_padrao)
+        SELECT %s, 'Membro Padrão', 0, TRUE
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM public.membros
+            WHERE matriz_id = %s
+            AND is_padrao = TRUE
+        );
+        """,
+        [str(matriz_id), str(matriz_id)],
+    )
+
+    # Busca o cronograma padrão do espaço.
+    cursor.execute(
+        """
+        SELECT id, matriz_id
+        FROM public.cronogramas
+        WHERE workspace_id = %s
+        AND is_padrao = TRUE
+        ORDER BY created_at ASC
+        LIMIT 1;
+        """,
+        [str(workspace_id)],
+    )
+
+    cronograma = cursor.fetchone()
+
+    # Cria o cronograma padrão vinculado à matriz padrão.
+    if not cronograma:
+        cursor.execute(
+            """
+            INSERT INTO public.cronogramas
+                (
+                    usuario_id,
+                    workspace_id,
+                    matriz_id,
+                    nome,
+                    is_padrao
+                )
+            VALUES (%s, %s, %s, %s, TRUE);
+            """,
+            [
+                str(usuario_id),
+                str(workspace_id),
+                str(matriz_id),
+                "Cronograma Padrão",
+            ],
+        )
+
+    # Mantém o cronograma padrão ligado à matriz padrão.
+    elif str(cronograma["matriz_id"] or "") != str(matriz_id):
+        cursor.execute(
+            """
+            UPDATE public.cronogramas
+            SET matriz_id = %s
+            WHERE id = %s
+            AND workspace_id = %s;
+            """,
+            [
+                str(matriz_id),
+                str(cronograma["id"]),
+                str(workspace_id),
+            ],
+        )
+
 
 def garantir_espaco_padrao(cursor, dados, usuario_id):
     """
@@ -70,7 +192,15 @@ def garantir_espaco_padrao(cursor, dados, usuario_id):
         [str(espaco["id"]), str(usuario_id)],
     )
 
+    # Garante os itens padrão do espaço inicial.
+    garantir_itens_padrao_workspace(
+        cursor,
+        espaco["id"],
+        usuario_id,
+    )
+
     dados.commit()
+
     return espaco
 
 
@@ -132,13 +262,27 @@ def get_current_workspace(
             [str(x_workspace_id), str(usuario["id"])],
         )
 
+    
     espaco = cursor.fetchone()
-    cursor.close()
 
     if not espaco:
+        cursor.close()
         raise HTTPException(
             status_code=404,
             detail="Espaço não encontrado ou usuário sem acesso.",
         )
 
+    # O espaço padrão já é inicializado em garantir_espaco_padrao().
+    # Os demais espaços também recebem seus itens padrão ao serem acessados.
+    if x_workspace_id is not None:
+        garantir_itens_padrao_workspace(
+            cursor,
+            espaco["id"],
+            espaco["owner_id"],
+        )
+        dados.commit()
+
+    cursor.close()
+
     return dict(espaco)
+
