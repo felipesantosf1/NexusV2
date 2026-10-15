@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.matrizes import router as matrizes_router
 from app.routes.raci import router as raci_router
 from app.routes.cronogramas import router as cronogramas_router
+from app.routes.workspaces import router as workspaces_router
 
 # Cria a aplicação da API do NexusPM
 app = FastAPI(title="NexusPM API")
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(matrizes_router)
 app.include_router(raci_router)
 app.include_router(cronogramas_router)
+app.include_router(workspaces_router)
 
 
 # Rota inicial da API

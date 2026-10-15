@@ -4,6 +4,14 @@ const toggleSidebar = document.getElementById("toggleSidebar");
 const toast = document.getElementById("toast");
 const supabaseClient = window.supabaseClient;
 
+const teamButton = document.getElementById("teamButton");
+const workspaceNameText = document.getElementById("workspaceNameText");
+const workspaceMenu = document.getElementById("workspaceMenu");
+const workspaceList = document.getElementById("workspaceList");
+const workspaceVisibilityPill = document.getElementById("workspaceVisibilityPill");
+const createWorkspaceButton = document.getElementById("createWorkspaceButton");
+const memberStack = document.querySelector(".member-stack");
+
 const seletorMatriz = document.getElementById("matrixSelect-raci");
 const tituloMatriz = document.querySelector(".raci-panel .matrix-title-row h2");
 const tituloGanttEditavel = document.querySelector("#view-gantt .gantt-panel .matrix-title-row h2");
@@ -25,6 +33,11 @@ const menuRaci = document.getElementById("menu-raci");
 let atribuicaoAlvoRaci = null;
 let cronogramasUsuario = [];
 let versaoRenderGantt = 0;
+
+let workspacesUsuario = [];
+let workspaceAtualId = null;
+let workspaceAtual = null;
+let membrosWorkspace = [];
 
 // O seletor ficará fora da tabela para não ser cortado pelo scroll.
 document.body.appendChild(menuRaci);
@@ -63,6 +76,9 @@ async function requisicaoApi(caminho, opcoes = {}) {
                     ? { "Content-Type": "application/json" }
                     : {}),
                 ...opcoes.headers,
+                ...(workspaceAtualId
+                    ? { "X-Workspace-ID": workspaceAtualId }
+                    : {}),
                 Authorization: `Bearer ${token}`
             }
         }
@@ -352,6 +368,9 @@ async function carregarMatrizes(idSelecionado = null) {
         matrizAtualId = null;
         tituloMatriz.textContent = "Nenhuma matriz";
         renderizarRaci();
+
+        await atualizarEstadoMenuMatriz();
+        await renderizarGanttVinculado();
         return;
     }
 
@@ -1029,6 +1048,283 @@ function preencherPerfil(user) {
         .forEach(el => el.textContent = iniciais);
 }
 
+
+// ESPAÇOS DE TRABALHO
+
+function atualizarCabecalhoWorkspace() {
+    if (!workspaceAtual) return;
+
+    workspaceNameText.textContent = workspaceAtual.nome;
+    workspaceNameText.title = "Dê dois cliques para renomear";
+
+    document.querySelectorAll(".breadcrumb span:first-child")
+        .forEach(elemento => {
+            elemento.textContent = workspaceAtual.nome;
+        });
+
+    const compartilhado = membrosWorkspace.length > 1;
+
+    workspaceVisibilityPill.innerHTML = compartilhado
+        ? '<i class="fa-solid fa-users"></i> Compartilhado'
+        : '<i class="fa-solid fa-lock"></i> Privado';
+}
+
+function renderizarListaWorkspaces() {
+    workspaceList.replaceChildren();
+
+    if (!workspacesUsuario.length) {
+        const vazio = document.createElement("p");
+        vazio.className = "workspace-empty";
+        vazio.textContent = "Nenhum espaço de trabalho encontrado.";
+        workspaceList.appendChild(vazio);
+        return;
+    }
+
+    workspacesUsuario.forEach(workspace => {
+        const botao = document.createElement("button");
+        botao.type = "button";
+        botao.className = "workspace-option";
+        botao.setAttribute("role", "menuitem");
+
+        const icone = document.createElement("i");
+        icone.className = "fa-solid fa-people-group";
+
+        const nome = document.createElement("span");
+        nome.textContent = workspace.nome;
+
+        const indicador = document.createElement("i");
+        indicador.className = "fa-solid fa-check";
+        indicador.hidden = String(workspace.id) !== String(workspaceAtualId);
+
+        if (String(workspace.id) === String(workspaceAtualId)) {
+            botao.classList.add("active");
+        }
+
+        botao.append(icone, nome, indicador);
+
+        botao.addEventListener("click", async () => {
+            fecharMenuWorkspace();
+
+            if (String(workspace.id) === String(workspaceAtualId)) {
+                return;
+            }
+
+            try {
+                await selecionarWorkspace(workspace.id);
+            } catch (error) {
+                console.error("Erro ao trocar espaço de trabalho:", error);
+                showToast(`Não foi possível trocar de espaço: ${error.message}`);
+            }
+        });
+
+        workspaceList.appendChild(botao);
+    });
+}
+
+function renderizarMembrosWorkspace() {
+    if (!memberStack) return;
+
+    memberStack.replaceChildren();
+    memberStack.setAttribute(
+        "aria-label",
+        `${membrosWorkspace.length} integrante(s) no espaço de trabalho`
+    );
+
+    membrosWorkspace.slice(0, 3).forEach(membro => {
+        const nome = membro.nome || membro.email || "Usuário";
+        const iniciais = nome
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(parte => parte[0].toUpperCase())
+            .join("") || "U";
+
+        const avatar = document.createElement("span");
+        avatar.className = "avatar avatar-blue";
+        avatar.textContent = iniciais;
+        avatar.title = `${nome}${membro.papel ? ` · ${membro.papel}` : ""}`;
+
+        memberStack.appendChild(avatar);
+    });
+
+    if (membrosWorkspace.length > 3) {
+        const excedentes = document.createElement("span");
+        excedentes.className = "avatar avatar-overflow";
+        excedentes.textContent = `+${membrosWorkspace.length - 3}`;
+        excedentes.title = `${membrosWorkspace.length - 3} outro(s) integrante(s)`;
+
+        memberStack.appendChild(excedentes);
+    }
+}
+
+async function carregarMembrosWorkspace() {
+    if (!workspaceAtualId) {
+        membrosWorkspace = [];
+        renderizarMembrosWorkspace();
+        return;
+    }
+
+    membrosWorkspace = await requisicaoApi(
+        `/workspaces/${workspaceAtualId}/members`
+    );
+
+    renderizarMembrosWorkspace();
+    atualizarCabecalhoWorkspace();
+}
+
+function fecharMenuWorkspace() {
+    workspaceMenu.classList.add("hidden");
+    teamButton.setAttribute("aria-expanded", "false");
+}
+
+function alternarMenuWorkspace() {
+    const vaiAbrir = workspaceMenu.classList.contains("hidden");
+
+    workspaceMenu.classList.toggle("hidden", !vaiAbrir);
+    teamButton.setAttribute("aria-expanded", String(vaiAbrir));
+
+    if (vaiAbrir) {
+        renderizarListaWorkspaces();
+    }
+}
+
+async function selecionarWorkspace(workspaceId) {
+    const escolhido = workspacesUsuario.find(
+        item => String(item.id) === String(workspaceId)
+    );
+
+    if (!escolhido) {
+        throw new Error("Espaço de trabalho não encontrado na sua lista.");
+    }
+
+    workspaceAtual = escolhido;
+    workspaceAtualId = String(escolhido.id);
+
+    try {
+        localStorage.setItem("nexus_workspace_id", workspaceAtualId);
+    } catch (error) {
+        console.warn("Não foi possível salvar o espaço selecionado:", error);
+    }
+
+    atualizarCabecalhoWorkspace();
+    renderizarListaWorkspaces();
+
+    // Limpa os dados visuais anteriores enquanto o novo espaço carrega.
+    matrizAtualId = null;
+    dadosRaci = {
+        tarefas: [],
+        membros: [],
+        atribuicoes: []
+    };
+
+    await carregarMembrosWorkspace();
+    await carregarMatrizes();
+}
+
+async function carregarListaWorkspaces(idPreferido = null) {
+    workspacesUsuario = await requisicaoApi("/workspaces/");
+
+    let idSalvo = null;
+
+    try {
+        idSalvo = localStorage.getItem("nexus_workspace_id");
+    } catch (error) {
+        console.warn("Não foi possível ler o espaço salvo:", error);
+    }
+
+    const escolhido =
+        workspacesUsuario.find(item => String(item.id) === String(idPreferido)) ||
+        workspacesUsuario.find(item => String(item.id) === String(idSalvo)) ||
+        workspacesUsuario.find(item => item.is_default) ||
+        workspacesUsuario[0];
+
+    if (!escolhido) {
+        throw new Error("Sua conta não possui espaços de trabalho disponíveis.");
+    }
+
+    await selecionarWorkspace(escolhido.id);
+}
+
+function removerParametroConviteDaUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invite");
+
+    history.replaceState(
+        null,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+    );
+}
+
+async function inicializarWorkspaces() {
+    const parametros = new URLSearchParams(window.location.search);
+    const tokenConvite = parametros.get("invite");
+    let workspaceConvidadoId = null;
+
+    // Aceita o convite antes de carregar a lista de espaços.
+    if (tokenConvite) {
+        try {
+            const resultado = await requisicaoApi(
+                `/workspaces/invites/${encodeURIComponent(tokenConvite)}/accept`,
+                { method: "POST" }
+            );
+
+            workspaceConvidadoId =
+                resultado?.workspace?.id ||
+                resultado?.id ||
+                resultado?.workspace_id ||
+                null;
+
+            showToast("Convite aceito. Espaço de trabalho adicionado.");
+        } catch (error) {
+            console.error("Erro ao aceitar convite:", error);
+            showToast(`Não foi possível aceitar o convite: ${error.message}`);
+        } finally {
+            removerParametroConviteDaUrl();
+        }
+    }
+
+    await carregarListaWorkspaces(workspaceConvidadoId);
+}
+
+// RENOMEAR O ESPAÇO COM DUPLO CLIQUE
+ativarEdicaoDuploClique(
+    workspaceNameText,
+    async novoNome => {
+        if (!workspaceAtualId) {
+            throw new Error("Nenhum espaço de trabalho selecionado.");
+        }
+
+        const atualizado = await requisicaoApi(
+            `/workspaces/${workspaceAtualId}`,
+            {
+                method: "PUT",
+                body: JSON.stringify({ nome: novoNome })
+            }
+        );
+
+        workspaceAtual = {
+            ...workspaceAtual,
+            ...atualizado,
+            nome: atualizado?.nome || novoNome
+        };
+
+        const indice = workspacesUsuario.findIndex(
+            item => String(item.id) === String(workspaceAtualId)
+        );
+
+        if (indice >= 0) {
+            workspacesUsuario[indice] = workspaceAtual;
+        }
+    },
+    async () => {
+        atualizarCabecalhoWorkspace();
+        renderizarListaWorkspaces();
+        showToast("Espaço de trabalho renomeado.");
+    }
+);
+
 // VALIDAR SESSÃO E CARREGAR DADOS
 async function verificarSessao() {
     try {
@@ -1036,12 +1332,20 @@ async function verificarSessao() {
         if (error) throw error;
 
         if (!data.session) {
-            window.location.replace("../auth/auth_index.html");
+            const destino = new URL("../auth/auth_index.html", window.location.href);
+            const tokenConvite = new URLSearchParams(window.location.search)
+                .get("invite");
+
+            if (tokenConvite) {
+                destino.searchParams.set("invite", tokenConvite);
+            }
+
+            window.location.replace(destino.href);
             return;
         }
 
         preencherPerfil(data.session.user);
-        await carregarMatrizes();
+        await inicializarWorkspaces();
     } catch (error) {
         console.error("Erro ao iniciar NexusPM:", error);
         showToast(`Erro ao carregar o sistema: ${error.message}`);
@@ -2421,6 +2725,232 @@ document.querySelectorAll("[data-view]").forEach(botao => {
     });
 });
 
+// CRIAR UM NOVO ESPAÇO DE TRABALHO
+async function criarWorkspace() {
+    fecharMenuWorkspace();
+
+    const nome = await abrirDialogoNexus({
+        titulo: "Criar espaço de trabalho",
+        descricao: "Cada espaço tem suas próprias matrizes, cronogramas e integrantes.",
+        rotulo: "Nome do espaço",
+        placeholder: "Ex.: Projeto Alpha",
+        textoConfirmar: "Criar espaço",
+        ancora: createWorkspaceButton
+    });
+
+    if (nome === null) return;
+
+    if (!nome.trim()) {
+        showToast("Informe o nome do espaço de trabalho.");
+        return;
+    }
+
+    createWorkspaceButton.disabled = true;
+
+    try {
+        const novo = await requisicaoApi("/workspaces/", {
+            method: "POST",
+            body: JSON.stringify({ nome: nome.trim() })
+        });
+
+        const novoId = novo?.id || novo?.workspace?.id;
+
+        if (!novoId) {
+            throw new Error("A API não retornou o ID do novo espaço.");
+        }
+
+        workspacesUsuario = await requisicaoApi("/workspaces/");
+        await selecionarWorkspace(novoId);
+
+        showToast("Espaço de trabalho criado.");
+    } catch (error) {
+        console.error("Erro ao criar espaço de trabalho:", error);
+        showToast(`Não foi possível criar o espaço: ${error.message}`);
+    } finally {
+        createWorkspaceButton.disabled = false;
+    }
+}
+
+// PAINEL DE CONVITE
+function garantirPainelConvite() {
+    let overlay = document.getElementById("workspaceInviteOverlay");
+
+    if (overlay) return overlay;
+
+    overlay = document.createElement("div");
+    overlay.id = "workspaceInviteOverlay";
+    overlay.className = "workspace-invite-overlay";
+    overlay.hidden = true;
+
+    overlay.innerHTML = `
+        <section
+            class="workspace-invite-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workspaceInviteTitle"
+        >
+            <button
+                type="button"
+                class="workspace-invite-close"
+                id="workspaceInviteClose"
+                aria-label="Fechar"
+            >&times;</button>
+
+            <div class="workspace-invite-icon">
+                <i class="fa-solid fa-user-plus"></i>
+            </div>
+
+            <h2 id="workspaceInviteTitle">Convidar para o espaço</h2>
+
+            <p class="workspace-invite-description">
+                Gere um link para permitir que outra pessoa entre neste espaço
+                de trabalho. O link expira em 7 dias.
+            </p>
+
+            <label class="workspace-invite-label" for="workspaceInviteLink">
+                Link de convite
+            </label>
+
+            <div class="workspace-invite-link-row">
+                <input
+                    id="workspaceInviteLink"
+                    type="text"
+                    readonly
+                    aria-label="Link de convite"
+                >
+                <button
+                    type="button"
+                    class="button primary-button"
+                    id="workspaceInviteCopy"
+                >
+                    <i class="fa-regular fa-copy"></i>
+                    Copiar
+                </button>
+            </div>
+
+            <p class="workspace-invite-feedback" id="workspaceInviteFeedback">
+                Gere um link para compartilhar com o integrante.
+            </p>
+
+            <button
+                type="button"
+                class="button secondary-button workspace-invite-generate"
+                id="workspaceInviteGenerate"
+            >
+                Gerar link de convite
+            </button>
+        </section>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const fechar = () => {
+        overlay.hidden = true;
+    };
+
+    overlay.querySelector("#workspaceInviteClose")
+        .addEventListener("click", fechar);
+
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) fechar();
+    });
+
+    overlay.querySelector("#workspaceInviteGenerate")
+        .addEventListener("click", gerarLinkConvite);
+
+    overlay.querySelector("#workspaceInviteCopy")
+        .addEventListener("click", copiarLinkConvite);
+
+    return overlay;
+}
+
+function abrirPainelConvite() {
+    if (!workspaceAtualId) {
+        showToast("Selecione um espaço de trabalho primeiro.");
+        return;
+    }
+
+    const overlay = garantirPainelConvite();
+    const campo = overlay.querySelector("#workspaceInviteLink");
+    const feedback = overlay.querySelector("#workspaceInviteFeedback");
+
+    campo.value = "";
+    feedback.textContent = "Gere um link para compartilhar com o integrante.";
+
+    overlay.hidden = false;
+}
+
+async function gerarLinkConvite() {
+    const overlay = garantirPainelConvite();
+    const botao = overlay.querySelector("#workspaceInviteGenerate");
+    const campo = overlay.querySelector("#workspaceInviteLink");
+    const feedback = overlay.querySelector("#workspaceInviteFeedback");
+
+    if (!workspaceAtualId) {
+        showToast("Nenhum espaço de trabalho selecionado.");
+        return;
+    }
+
+    botao.disabled = true;
+    feedback.textContent = "Gerando convite...";
+
+    try {
+        const resultado = await requisicaoApi(
+            `/workspaces/${workspaceAtualId}/invites`,
+            { method: "POST" }
+        );
+
+        if (!resultado?.token) {
+            throw new Error("A API não retornou o token do convite.");
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set("invite", resultado.token);
+
+        campo.value = url.href;
+        feedback.textContent =
+            "Link gerado. Compartilhe-o apenas com a pessoa que deseja convidar.";
+
+        campo.focus();
+        campo.select();
+    } catch (error) {
+        console.error("Erro ao gerar convite:", error);
+        feedback.textContent = `Não foi possível gerar o convite: ${error.message}`;
+    } finally {
+        botao.disabled = false;
+    }
+}
+
+async function copiarLinkConvite() {
+    const overlay = garantirPainelConvite();
+    const campo = overlay.querySelector("#workspaceInviteLink");
+    const feedback = overlay.querySelector("#workspaceInviteFeedback");
+
+    if (!campo.value) {
+        feedback.textContent = "Gere um link antes de copiar.";
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(campo.value);
+        feedback.textContent = "Link copiado. Já pode compartilhá-lo.";
+        showToast("Link de convite copiado.");
+    } catch (error) {
+        campo.focus();
+        campo.select();
+
+        const copiado = document.execCommand("copy");
+
+        feedback.textContent = copiado
+            ? "Link copiado. Já pode compartilhá-lo."
+            : "O link está selecionado. Copie-o manualmente.";
+
+        if (copiado) {
+            showToast("Link de convite copiado.");
+        }
+    }
+}
+
 // AÇÕES DA INTERFACE
 document.querySelectorAll("[data-demo-action]").forEach(botao => {
     const acao = botao.dataset.demoAction;
@@ -2515,12 +3045,32 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
     }
 });
 
-document.getElementById("inviteButton").addEventListener("click", () => {
-    showToast("Convites serão implementados em uma próxima etapa.");
+document.getElementById("inviteButton")
+    .addEventListener("click", abrirPainelConvite);
+
+teamButton.addEventListener("click", event => {
+    event.stopPropagation();
+    alternarMenuWorkspace();
 });
 
-document.getElementById("teamButton").addEventListener("click", () => {
-    showToast("A seleção de equipe será implementada posteriormente.");
+createWorkspaceButton.addEventListener("click", async () => {
+    try {
+        await criarWorkspace();
+    } catch (error) {
+        console.error("Erro ao abrir criação de espaço:", error);
+        showToast(error.message);
+    }
+});
+
+// Fechar o menu ao clicar fora dele.
+document.addEventListener("click", event => {
+    if (
+        !workspaceMenu.classList.contains("hidden") &&
+        !workspaceMenu.contains(event.target) &&
+        !teamButton.contains(event.target)
+    ) {
+        fecharMenuWorkspace();
+    }
 });
 
 document.addEventListener("keydown", event => {
@@ -2528,6 +3078,8 @@ document.addEventListener("keydown", event => {
         fecharMenuMatriz();
         fecharMenuGrafico();
         fecharMenuRaci();
+        fecharMenuWorkspace();
+        document.getElementById("workspaceInviteOverlay")?.setAttribute("hidden", "");
     }
 });
 

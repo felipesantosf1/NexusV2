@@ -465,6 +465,131 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
     background: var(--surface-hover);
 }
 
+/* Painel de convite do espaço de trabalho */
+.workspace-invite-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(3px);
+}
+
+.workspace-invite-overlay[hidden] {
+    display: none !important;
+}
+
+.workspace-invite-dialog {
+    position: relative;
+    width: min(480px, 100%);
+    padding: 28px;
+    border: 1px solid var(--border, #303746);
+    border-radius: 14px;
+    background: var(--surface-raised, #171d28);
+    color: var(--text, #f1f5f9);
+    box-shadow: 0 22px 70px rgba(0, 0, 0, 0.4);
+}
+
+.workspace-invite-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted, #9ca3af);
+    font-size: 25px;
+    cursor: pointer;
+}
+
+.workspace-invite-close:hover {
+    background: var(--surface-hover, #293142);
+    color: var(--text, #f1f5f9);
+}
+
+.workspace-invite-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+    background: rgba(75, 133, 230, 0.15);
+    color: #8ab7ff;
+}
+
+.workspace-invite-dialog h2 {
+    margin: 0 36px 9px 0;
+    font-size: 18px;
+    font-weight: 650;
+}
+
+.workspace-invite-description {
+    margin: 0 0 22px;
+    color: var(--text-muted, #9ca3af);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.workspace-invite-label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.workspace-invite-link-row {
+    display: flex;
+    gap: 8px;
+}
+
+.workspace-invite-link-row input {
+    min-width: 0;
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border, #303746);
+    border-radius: 7px;
+    outline: none;
+    background: var(--surface, #10151e);
+    color: var(--text, #f1f5f9);
+    font-size: 11px;
+}
+
+.workspace-invite-link-row .button {
+    flex: 0 0 auto;
+    gap: 7px;
+}
+
+.workspace-invite-feedback {
+    min-height: 30px;
+    margin: 10px 0 14px;
+    color: var(--text-muted, #9ca3af);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.workspace-invite-generate {
+    width: 100%;
+    justify-content: center;
+}
+
+.workspace-invite-dialog button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.member-stack .avatar-overflow {
+    display: grid;
+    place-items: center;
+    background: var(--surface-hover, #293142);
+    color: var(--text, #f1f5f9);
+    font-size: 10px;
+    font-weight: 700;
+}
 /* FOOTER */
 .app-footer { display: flex; justify-content: space-between; gap: 12px; padding: 22px 2px 4px; color: #5e626e; font-size: 9px; }
 .app-footer span { display: inline-flex; align-items: center; gap: 6px; }

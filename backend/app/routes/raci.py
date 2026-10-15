@@ -31,30 +31,32 @@ class AtribuicaoEntrada(BaseModel):
 
 
 
+
 def verificar_matriz(cursor, matriz_id, usuario_id):
     cursor.execute(
         """
-        SELECT id, usuario_id, nome
-        FROM matrizes
-        WHERE id = %s;
+        SELECT
+            m.id,
+            m.workspace_id
+        FROM public.matrizes AS m
+        INNER JOIN public.workspace_members AS wm
+            ON wm.workspace_id = m.workspace_id
+        WHERE m.id = %s
+        AND wm.usuario_id = %s;
         """,
-        [str(matriz_id)],
+        [str(matriz_id), str(usuario_id)],
     )
 
     matriz = cursor.fetchone()
 
-    # Diagnóstico temporário: mostra os IDs no terminal do backend.
-    print("\n--- DIAGNÓSTICO RACIS ---")
-    print("Matriz solicitada:", matriz_id)
-    print("Usuário autenticado:", usuario_id)
-    print("Matriz encontrada no banco:", dict(matriz) if matriz else None)
-    print("--- FIM DO DIAGNÓSTICO ---\n")
-
-    if not matriz or str(matriz["usuario_id"]) != str(usuario_id):
+    if not matriz:
         raise HTTPException(
             status_code=404,
-            detail="Matriz não encontrada para este usuário.",
+            detail="Matriz não encontrada ou usuário sem acesso ao espaço.",
         )
+
+    return matriz
+
 
 
 

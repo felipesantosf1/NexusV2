@@ -1,5 +1,17 @@
 const supabaseClient = window.supabaseClient;
 
+function obterDestinoCore() {
+    const destino = new URL("../core/index.html", window.location.href);
+    const tokenConvite = new URLSearchParams(window.location.search)
+        .get("invite");
+
+    if (tokenConvite) {
+        destino.searchParams.set("invite", tokenConvite);
+    }
+
+    return destino.href;
+}
+
 let alertaTimeouts = {};
 
 // MOSTRAR OU OCULTAR SENHA
@@ -119,7 +131,7 @@ async function handleLogin(event) {
         if (error) throw error;
         if (!data.session) throw new Error("Não foi possível iniciar a sessão.");
 
-        window.location.replace("../core/index.html");
+        window.location.replace(obterDestinoCore());
 
     } catch (error) {
         mostrarAlerta("login", mensagemErroAuth(error), "error");
@@ -161,14 +173,24 @@ async function handleRegister(event) {
             password,
             options: {
                 data: { username: nome },
-                emailRedirectTo: new URL("auth_index.html", window.location.href).href
+                emailRedirectTo: (() => {
+                    const destino = new URL("auth_index.html", window.location.href);
+                    const tokenConvite = new URLSearchParams(window.location.search)
+                        .get("invite");
+
+                    if (tokenConvite) {
+                        destino.searchParams.set("invite", tokenConvite);
+                    }
+
+                    return destino.href;
+                })()
             }
         });
 
         if (error) throw error;
 
         if (data.session) {
-            window.location.replace("../core/index.html");
+            window.location.replace(obterDestinoCore());
             return;
         }
 
@@ -272,7 +294,7 @@ async function iniciarAutenticacao() {
     const { data, error } = await supabaseClient.auth.getSession();
 
     if (!error && data.session) {
-        window.location.replace("../core/index.html");
+        window.location.replace(obterDestinoCore());
     }
 }
 
