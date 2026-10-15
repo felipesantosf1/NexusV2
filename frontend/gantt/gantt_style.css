@@ -313,3 +313,21 @@
     justify-content: flex-end;
     gap: 8px;
 }
+
+
+/* Seletor compacto de status nas linhas do Gantt. */
+.gantt-task-status {
+    max-width: 115px;
+    padding: 5px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.gantt-task-status:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}

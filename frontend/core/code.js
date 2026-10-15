@@ -1611,6 +1611,46 @@ async function editarPlanejamentoGantt(tarefa, cronograma) {
     }
 }
 
+// Salva o status diretamente na linha da tarefa.
+async function salvarStatusGantt(tarefa, cronograma, novoStatus, seletor) {
+    const statusAnterior = normalizarStatusGantt(tarefa.status);
+
+    seletor.disabled = true;
+
+    try {
+        const endpoint = cronograma.matriz_id
+            ? `/matrizes/${cronograma.matriz_id}/tarefas-raci/${tarefa.id}/planejamento`
+            : `/cronogramas/${cronograma.id}/tarefas/${tarefa.id}/planejamento`;
+
+        const atualizada = await requisicaoApi(endpoint, {
+            method: "PATCH",
+            body: JSON.stringify({
+                data_inicio: tarefa.data_inicio || null,
+                data_fim: tarefa.data_fim || null,
+                status: novoStatus
+            })
+        });
+
+        tarefa.status = atualizada.status;
+
+        if (
+            cronograma.matriz_id &&
+            String(matrizAtualId) === String(cronograma.matriz_id)
+        ) {
+            await carregarDadosRaci(cronograma.matriz_id);
+        } else {
+            await renderizarGanttVinculado();
+        }
+
+        showToast("Status atualizado.");
+    } catch (error) {
+        seletor.value = statusAnterior;
+        showToast(`Erro ao alterar status: ${error.message}`);
+    } finally {
+        seletor.disabled = false;
+    }
+}
+
 // Botão de calendário ao lado de cada tarefa.
 function criarBotaoPlanejamentoGantt(tarefa, cronograma) {
     const botao = document.createElement("button");
@@ -1928,8 +1968,22 @@ async function renderizarGanttVinculado() {
         acoes.className = "gantt-task-row-actions";
 
         // Mostra o status real da tarefa.
-        const status = document.createElement("small");
-        status.textContent = rotuloStatusGantt(tarefa.status);
+        const status = document.createElement("select");
+        status.className = "gantt-task-status";
+        status.setAttribute("aria-label", `Status da tarefa ${tarefa.nome}`);
+
+        status.innerHTML = `
+            <option value="pending">Pendente</option>
+            <option value="in_progress">Em andamento</option>
+            <option value="done">Concluída</option>
+        `;
+
+        status.value = normalizarStatusGantt(tarefa.status);
+
+        status.addEventListener("change", () => {
+            salvarStatusGantt(tarefa, cronograma, status.value, status);
+        });
+
         acoes.appendChild(status);
 
         // Botão para editar datas e status.
