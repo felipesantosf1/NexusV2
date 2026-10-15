@@ -1342,44 +1342,98 @@ async function exportarGraficoExcel() {
         return;
     }
 
-    if (!grafico.matriz_id) {
-        showToast("Vincule uma matriz antes de exportar as tarefas.");
-        return;
-    }
+    try {
+        let tarefas = [];
+        let membros = [];
+        let atribuicoes = [];
 
-    const raci = String(grafico.matriz_id) === String(matrizAtualId)
-        ? dadosRaci
-        : await requisicaoApi(`/matrizes/${grafico.matriz_id}/raci`);
+        // Busca tarefas próprias ou tarefas da matriz vinculada.
+        if (grafico.matriz_id) {
+            const raci =
+                String(grafico.matriz_id) === String(matrizAtualId)
+                    ? dadosRaci
+                    : await requisicaoApi(
+                        `/matrizes/${grafico.matriz_id}/raci`
+                    );
 
-    const linhas = [[
-        "Tarefa / Atividade",
-        ...(raci.membros || []).map(membro => membro.nome)
-    ]];
-
-    (raci.tarefas || []).forEach(tarefa => {
-        const linha = [tarefa.nome];
-
-        (raci.membros || []).forEach(membro => {
-            const atribuicao = (raci.atribuicoes || []).find(item =>
-                item.tarefa_id === tarefa.id &&
-                item.membro_id === membro.id
+            tarefas = raci.tarefas || [];
+            membros = raci.membros || [];
+            atribuicoes = raci.atribuicoes || [];
+        } else {
+            tarefas = await requisicaoApi(
+                `/cronogramas/${grafico.id}/tarefas`
             );
+        }
 
-            linha.push(atribuicao?.papel || "-");
+        // Cabeçalho principal da planilha.
+        const linhas = [[
+            "Tarefa / Atividade",
+            "Data de início",
+            "Data de término",
+            "Status",
+            ...membros.map(membro => membro.nome)
+        ]];
+
+        tarefas.forEach(tarefa => {
+            const linha = [
+                tarefa.nome,
+                tarefa.data_inicio
+                    ? formatarDataGantt(tarefa.data_inicio)
+                    : "Não definida",
+                tarefa.data_fim
+                    ? formatarDataGantt(tarefa.data_fim)
+                    : "Não definida",
+                rotuloStatusGantt(tarefa.status)
+            ];
+
+            // Mantém as atribuições RACIS quando houver vínculo.
+            membros.forEach(membro => {
+                const atribuicao = atribuicoes.find(item =>
+                    String(item.tarefa_id) === String(tarefa.id) &&
+                    String(item.membro_id) === String(membro.id)
+                );
+
+                linha.push(atribuicao?.papel || "-");
+            });
+
+            linhas.push(linha);
         });
 
-        linhas.push(linha);
-    });
+        const planilha = XLSX.utils.aoa_to_sheet(linhas);
 
-    const planilha = XLSX.utils.aoa_to_sheet(linhas);
-    const livro = XLSX.utils.book_new();
+        // Larguras adequadas para leitura dos campos.
+        planilha["!cols"] = [
+            { wch: 45 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 18 },
+            ...membros.map(() => ({ wch: 20 }))
+        ];
 
-    XLSX.utils.book_append_sheet(livro, planilha, "Tarefas do Gantt");
+        // Congela o cabeçalho durante a rolagem.
+        planilha["!freeze"] = {
+            xSplit: 0,
+            ySplit: 1
+        };
 
-    const nomeArquivo = grafico.nome
-        .replace(/[\\/:*?"<>|]/g, "_");
+        const livro = XLSX.utils.book_new();
 
-    XLSX.writeFile(livro, `${nomeArquivo}.xlsx`);
+        XLSX.utils.book_append_sheet(
+            livro,
+            planilha,
+            "Cronograma Gantt"
+        );
+
+        const nomeArquivo = (grafico.nome || "Cronograma_Gantt")
+            .replace(/[\\/:*?"<>|]/g, "_");
+
+        XLSX.writeFile(livro, `${nomeArquivo}.xlsx`);
+
+        showToast("Cronograma exportado para Excel.");
+    } catch (error) {
+        console.error("Erro ao exportar cronograma:", error);
+        showToast(`Não foi possível exportar: ${error.message}`);
+    }
 }
 
 // Converte o valor salvo para um status conhecido.

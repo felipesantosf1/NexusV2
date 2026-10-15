@@ -331,3 +331,36 @@
     opacity: 0.6;
     cursor: wait;
 }
+
+/* Amplia a coluna de tarefas e habilita a rolagem horizontal. */
+.gantt-demo-table {
+    grid-template-columns: 500px minmax(900px, 1fr);
+    min-width: 1400px;
+}
+
+/* Mantém as tarefas visíveis durante a rolagem do calendário. */
+.gantt-task-column {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    align-self: start;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+
+/* Permite ler nomes longos em várias linhas. */
+.gantt-task-row .gantt-task-name-group > span:not(:first-child) {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    line-height: 1.4;
+}
+
+/* Mantém os controles à direita sem esmagar o nome. */
+.gantt-task-row-actions {
+    flex: 0 0 auto;
+}
