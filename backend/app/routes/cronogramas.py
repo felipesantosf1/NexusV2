@@ -1,14 +1,16 @@
+
+from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
-from datetime import date
-from typing import Literal
-
 from app.auth import get_current_user
 from app.database import get_db
+from app.workspace_context import get_current_workspace
+
 
 router = APIRouter(prefix="/cronogramas", tags=["Cronogramas"])
 
@@ -16,78 +18,96 @@ router = APIRouter(prefix="/cronogramas", tags=["Cronogramas"])
 class CronogramaCriacao(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
 
+
 class CronogramaAtualizacao(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
 
-# dados de prazo e status das tarefas do Gantt independente.
+
 class PlanejamentoTarefaAtualizacao(BaseModel):
     data_inicio: date | None = None
     data_fim: date | None = None
     status: Literal["pending", "in_progress", "done"] = "pending"
 
+
 class VinculoCronograma(BaseModel):
     matriz_id: UUID | None = None
 
 
+# Lista somente os cronogramas do espaço atual.
 @router.get("/")
-def listar_cronogramas(dados=Depends(get_db), usuario=Depends(get_current_user)):
+def listar_cronogramas(
+    dados=Depends(get_db),
+    workspace=Depends(get_current_workspace),
+):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
+
     cursor.execute(
         """
         SELECT
             c.id,
             c.usuario_id,
+            c.workspace_id,
             c.matriz_id,
             c.nome,
             c.is_padrao,
             m.nome AS matriz_nome,
             COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao,
             c.created_at
-        FROM cronogramas AS c
-        LEFT JOIN matrizes AS m
+        FROM public.cronogramas AS c
+        LEFT JOIN public.matrizes AS m
             ON m.id = c.matriz_id
-            AND m.usuario_id = c.usuario_id
-        WHERE c.usuario_id = %s
+            AND m.workspace_id = c.workspace_id
+        WHERE c.workspace_id = %s
         ORDER BY c.created_at;
         """,
-        [str(usuario["id"])],
+        [str(workspace["id"])],
     )
+
     resultado = cursor.fetchall()
     cursor.close()
     return resultado
 
 
+# Cria um cronograma independente no espaço atual.
 @router.post("/", status_code=201)
 def criar_cronograma(
     entrada: CronogramaCriacao,
     dados=Depends(get_db),
     usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     nome = entrada.nome.strip()
+
     if not nome:
         raise HTTPException(400, "Informe o nome do cronograma.")
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
+
     cursor.execute(
         """
-        INSERT INTO cronogramas (usuario_id, matriz_id, nome)
-        VALUES (%s, NULL, %s)
-        RETURNING id, usuario_id, matriz_id, nome, created_at;
+        INSERT INTO public.cronogramas
+            (usuario_id, workspace_id, matriz_id, nome)
+        VALUES (%s, %s, NULL, %s)
+        RETURNING
+            id, usuario_id, workspace_id, matriz_id,
+            nome, is_padrao, created_at;
         """,
-        [str(usuario["id"]), nome],
+        [str(usuario["id"]), str(workspace["id"]), nome],
     )
+
     cronograma = cursor.fetchone()
     dados.commit()
     cursor.close()
     return cronograma
 
-# ALTERADO: permite renomear um gráfico Gantt independente.
+
+# Renomeia um cronograma do espaço atual.
 @router.put("/{cronograma_id}")
 def atualizar_cronograma(
     cronograma_id: UUID,
     entrada: CronogramaAtualizacao,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     nome = entrada.nome.strip()
 
@@ -98,81 +118,82 @@ def atualizar_cronograma(
 
     cursor.execute(
         """
-        UPDATE cronogramas
+        UPDATE public.cronogramas
         SET nome = %s
-        WHERE id = %s AND usuario_id = %s
-        RETURNING id, usuario_id, matriz_id, nome, created_at;
+        WHERE id = %s AND workspace_id = %s
+        RETURNING
+            id, usuario_id, workspace_id, matriz_id,
+            nome, is_padrao, created_at;
         """,
-        [nome, str(cronograma_id), str(usuario["id"])],
+        [nome, str(cronograma_id), str(workspace["id"])],
     )
 
     cronograma = cursor.fetchone()
 
     if not cronograma:
         cursor.close()
-        raise HTTPException(404, "Gráfico não encontrado.")
+        raise HTTPException(404, "Gráfico não encontrado neste espaço.")
 
     dados.commit()
     cursor.close()
-
     return cronograma
 
+
+# Vincula ou desvincula um cronograma de uma matriz do mesmo espaço.
 @router.put("/{cronograma_id}/vinculo")
 def atualizar_vinculo(
     cronograma_id: UUID,
     entrada: VinculoCronograma,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
+    workspace_id = str(workspace["id"])
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    usuario_id = str(usuario["id"])
-    matriz_destino_padrao = False
 
     cursor.execute(
         """
-        SELECT
-            c.id,
-            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
-        FROM cronogramas AS c
-        LEFT JOIN matrizes AS m
-            ON m.id = c.matriz_id
-            AND m.usuario_id = c.usuario_id
-        WHERE c.id = %s AND c.usuario_id = %s;
+        SELECT id, matriz_id, is_padrao
+        FROM public.cronogramas
+        WHERE id = %s AND workspace_id = %s;
         """,
-        [str(cronograma_id), usuario_id],
+        [str(cronograma_id), workspace_id],
     )
-    cronograma_atual = cursor.fetchone()
 
-    if not cronograma_atual:
+    cronograma = cursor.fetchone()
+
+    if not cronograma:
         cursor.close()
-        raise HTTPException(404, "Cronograma não encontrado.")
+        raise HTTPException(404, "Cronograma não encontrado neste espaço.")
 
     if entrada.matriz_id is not None:
         cursor.execute(
             """
-            SELECT id, is_padrao FROM matrizes
-            WHERE id = %s AND usuario_id = %s;
+            SELECT id
+            FROM public.matrizes
+            WHERE id = %s AND workspace_id = %s;
             """,
-            [str(entrada.matriz_id), usuario_id],
+            [str(entrada.matriz_id), workspace_id],
         )
+
         if not cursor.fetchone():
             cursor.close()
-            raise HTTPException(404, "Matriz não encontrada.")
+            raise HTTPException(
+                404,
+                "Matriz não encontrada neste espaço de trabalho.",
+            )
 
-        # Cada matriz pode ter no máximo um Gantt vinculado.
+        # Impede que a mesma matriz seja vinculada a dois cronogramas.
         cursor.execute(
             """
-            SELECT id FROM cronogramas
+            SELECT id
+            FROM public.cronogramas
             WHERE matriz_id = %s
-            AND usuario_id = %s
-            AND id <> %s;
+              AND workspace_id = %s
+              AND id <> %s;
             """,
-            [
-                str(entrada.matriz_id),
-                usuario_id,
-                str(cronograma_id),
-            ],
+            [str(entrada.matriz_id), workspace_id, str(cronograma_id)],
         )
+
         if cursor.fetchone():
             cursor.close()
             raise HTTPException(
@@ -182,98 +203,96 @@ def atualizar_vinculo(
 
     cursor.execute(
         """
-        UPDATE cronogramas
-        SET matriz_id = %s,
-            is_padrao = (is_padrao OR %s)
-        WHERE id = %s AND usuario_id = %s
-        RETURNING id, usuario_id, matriz_id, nome, created_at, is_padrao;
+        UPDATE public.cronogramas
+        SET matriz_id = %s
+        WHERE id = %s AND workspace_id = %s
+        RETURNING
+            id, usuario_id, workspace_id, matriz_id,
+            nome, is_padrao, created_at;
         """,
         [
             str(entrada.matriz_id) if entrada.matriz_id else None,
-            matriz_destino_padrao,  # #ALTERADO
             str(cronograma_id),
-            usuario_id,
+            workspace_id,
         ],
     )
 
-    cronograma = cursor.fetchone()
+    resultado = cursor.fetchone()
     dados.commit()
     cursor.close()
-    return cronograma
+    return resultado
 
 
+# Exclui somente cronogramas não protegidos do espaço atual.
 @router.delete("/{cronograma_id}", status_code=204)
 def excluir_cronograma(
     cronograma_id: UUID,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user)
+    workspace=Depends(get_current_workspace),
 ):
+    workspace_id = str(workspace["id"])
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
-    # #ALTERADO: identifica se o gráfico está vinculado à matriz padrão.
     cursor.execute(
         """
         SELECT
-        c.is_padrao,
-        COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
-        FROM cronogramas AS c
-        LEFT JOIN matrizes AS m
+            c.is_padrao,
+            COALESCE(m.is_padrao, FALSE) AS matriz_is_padrao
+        FROM public.cronogramas AS c
+        LEFT JOIN public.matrizes AS m
             ON m.id = c.matriz_id
-            AND m.usuario_id = c.usuario_id
-        WHERE c.id = %s AND c.usuario_id = %s;
+            AND m.workspace_id = c.workspace_id
+        WHERE c.id = %s AND c.workspace_id = %s;
         """,
-        [str(cronograma_id), str(usuario["id"])]
+        [str(cronograma_id), workspace_id],
     )
 
     cronograma = cursor.fetchone()
 
     if not cronograma:
         cursor.close()
-        raise HTTPException(404, "Gráfico não encontrado.")
+        raise HTTPException(404, "Gráfico não encontrado neste espaço.")
 
-    # Proteção no servidor contra exclusão do Gantt padrão.
     if cronograma["is_padrao"] or cronograma["matriz_is_padrao"]:
         cursor.close()
-        raise HTTPException(
-            400,
-            "O gráfico padrão não pode ser excluído."
-        )
+        raise HTTPException(400, "O gráfico padrão não pode ser excluído.")
 
     cursor.execute(
         """
-        DELETE FROM cronogramas
-        WHERE id = %s AND usuario_id = %s
+        DELETE FROM public.cronogramas
+        WHERE id = %s AND workspace_id = %s
         RETURNING id;
         """,
-        [str(cronograma_id), str(usuario["id"])]
+        [str(cronograma_id), workspace_id],
     )
 
-    cronograma_excluido = cursor.fetchone()
-
-    if not cronograma_excluido:
+    if not cursor.fetchone():
         cursor.close()
-        raise HTTPException(404, "Gráfico não encontrado.")
+        raise HTTPException(404, "Gráfico não encontrado neste espaço.")
 
     dados.commit()
     cursor.close()
-
     return None
 
-# Verifica se o gráfico existe e está independente.
-def verificar_cronograma_independente(cursor, cronograma_id, usuario_id):
+
+# Verifica se o cronograma existe e é independente no espaço atual.
+def verificar_cronograma_independente(cursor, cronograma_id, workspace_id):
     cursor.execute(
         """
-        SELECT id, matriz_id
-        FROM cronogramas
-        WHERE id = %s AND usuario_id = %s;
+        SELECT id, workspace_id, matriz_id
+        FROM public.cronogramas
+        WHERE id = %s AND workspace_id = %s;
         """,
-        [str(cronograma_id), str(usuario_id)],
+        [str(cronograma_id), str(workspace_id)],
     )
 
     cronograma = cursor.fetchone()
 
     if not cronograma:
-        raise HTTPException(404, "Gráfico não encontrado.")
+        raise HTTPException(
+            404,
+            "Gráfico não encontrado neste espaço de trabalho.",
+        )
 
     if cronograma["matriz_id"] is not None:
         raise HTTPException(
@@ -284,24 +303,25 @@ def verificar_cronograma_independente(cursor, cronograma_id, usuario_id):
     return cronograma
 
 
-# Listar tarefas de um Gantt independente.
+# Lista as tarefas de um cronograma independente.
 @router.get("/{cronograma_id}/tarefas")
 def listar_tarefas_gantt(
     cronograma_id: UUID,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     verificar_cronograma_independente(
-        cursor, cronograma_id, usuario["id"]
+        cursor, cronograma_id, workspace["id"]
     )
 
     cursor.execute(
         """
-        SELECT id, cronograma_id, nome, data_inicio, data_fim,
-        status, ordem, is_padrao, created_at
-        FROM tarefas_cronograma
+        SELECT
+            id, cronograma_id, nome, data_inicio, data_fim,
+            status, ordem, is_padrao, created_at
+        FROM public.tarefas_cronograma
         WHERE cronograma_id = %s
         ORDER BY ordem, created_at;
         """,
@@ -313,13 +333,13 @@ def listar_tarefas_gantt(
     return tarefas
 
 
-# Criar tarefa de Gantt independente.
+# Cria uma tarefa no cronograma independente.
 @router.post("/{cronograma_id}/tarefas", status_code=201)
 def criar_tarefa_gantt(
     cronograma_id: UUID,
     entrada: CronogramaAtualizacao,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     nome = entrada.nome.strip()
 
@@ -329,26 +349,28 @@ def criar_tarefa_gantt(
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     verificar_cronograma_independente(
-        cursor, cronograma_id, usuario["id"]
+        cursor, cronograma_id, workspace["id"]
     )
 
     cursor.execute(
         """
         SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
-        FROM tarefas_cronograma
+        FROM public.tarefas_cronograma
         WHERE cronograma_id = %s;
         """,
         [str(cronograma_id)],
     )
+
     ordem = cursor.fetchone()["proxima"]
 
     cursor.execute(
         """
-        INSERT INTO tarefas_cronograma
+        INSERT INTO public.tarefas_cronograma
             (cronograma_id, nome, ordem, is_padrao)
         VALUES (%s, %s, %s, FALSE)
-        RETURNING id, cronograma_id, nome, data_inicio, data_fim,
-        status, ordem, is_padrao, created_at;
+        RETURNING
+            id, cronograma_id, nome, data_inicio, data_fim,
+            status, ordem, is_padrao, created_at;
         """,
         [str(cronograma_id), nome, ordem],
     )
@@ -359,14 +381,14 @@ def criar_tarefa_gantt(
     return tarefa
 
 
-# Renomear uma tarefa de Gantt independente.
+# Renomeia uma tarefa de um cronograma independente.
 @router.put("/{cronograma_id}/tarefas/{tarefa_id}")
 def renomear_tarefa_gantt(
     cronograma_id: UUID,
     tarefa_id: UUID,
     entrada: CronogramaAtualizacao,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     nome = entrada.nome.strip()
 
@@ -376,16 +398,17 @@ def renomear_tarefa_gantt(
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     verificar_cronograma_independente(
-        cursor, cronograma_id, usuario["id"]
+        cursor, cronograma_id, workspace["id"]
     )
 
     cursor.execute(
         """
-        UPDATE tarefas_cronograma
+        UPDATE public.tarefas_cronograma
         SET nome = %s
         WHERE id = %s AND cronograma_id = %s
-        RETURNING id, cronograma_id, nome, data_inicio, data_fim,
-        status, ordem, is_padrao, created_at;
+        RETURNING
+            id, cronograma_id, nome, data_inicio, data_fim,
+            status, ordem, is_padrao, created_at;
         """,
         [nome, str(tarefa_id), str(cronograma_id)],
     )
@@ -401,24 +424,27 @@ def renomear_tarefa_gantt(
     return tarefa
 
 
-# Excluir tarefa de Gantt independente, exceto padrão.
-@router.delete("/{cronograma_id}/tarefas/{tarefa_id}", status_code=204)
+# Exclui tarefas independentes, exceto a tarefa padrão.
+@router.delete(
+    "/{cronograma_id}/tarefas/{tarefa_id}",
+    status_code=204,
+)
 def excluir_tarefa_gantt(
     cronograma_id: UUID,
     tarefa_id: UUID,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     verificar_cronograma_independente(
-        cursor, cronograma_id, usuario["id"]
+        cursor, cronograma_id, workspace["id"]
     )
 
     cursor.execute(
         """
         SELECT is_padrao
-        FROM tarefas_cronograma
+        FROM public.tarefas_cronograma
         WHERE id = %s AND cronograma_id = %s;
         """,
         [str(tarefa_id), str(cronograma_id)],
@@ -436,7 +462,7 @@ def excluir_tarefa_gantt(
 
     cursor.execute(
         """
-        DELETE FROM tarefas_cronograma
+        DELETE FROM public.tarefas_cronograma
         WHERE id = %s AND cronograma_id = %s;
         """,
         [str(tarefa_id), str(cronograma_id)],
@@ -447,14 +473,16 @@ def excluir_tarefa_gantt(
     return None
 
 
-# Atualizar datas e status de uma tarefa independente.
-@router.patch("/{cronograma_id}/tarefas/{tarefa_id}/planejamento")
+# Atualiza datas e status de uma tarefa independente.
+@router.patch(
+    "/{cronograma_id}/tarefas/{tarefa_id}/planejamento"
+)
 def atualizar_planejamento_gantt(
     cronograma_id: UUID,
     tarefa_id: UUID,
     entrada: PlanejamentoTarefaAtualizacao,
     dados=Depends(get_db),
-    usuario=Depends(get_current_user),
+    workspace=Depends(get_current_workspace),
 ):
     if (entrada.data_inicio is None) != (entrada.data_fim is None):
         raise HTTPException(
@@ -474,12 +502,12 @@ def atualizar_planejamento_gantt(
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     verificar_cronograma_independente(
-        cursor, cronograma_id, usuario["id"]
+        cursor, cronograma_id, workspace["id"]
     )
 
     cursor.execute(
         """
-        UPDATE tarefas_cronograma
+        UPDATE public.tarefas_cronograma
         SET data_inicio = %s,
             data_fim = %s,
             status = %s
