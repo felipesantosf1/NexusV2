@@ -832,8 +832,8 @@ seletorMatriz.addEventListener("change", async () => {
 });
 
 // CRIAR TAREFA
+
 async function adicionarTarefa(event) {
-    // Campo personalizado junto ao botão Tarefa.
     const nome = await abrirDialogoNexus({
         titulo: "Nova tarefa",
         descricao: "Adicione uma atividade à matriz RACIS.",
@@ -844,26 +844,64 @@ async function adicionarTarefa(event) {
     });
 
     if (nome === null) return;
-    if (!nome.trim()) {
+
+    const nomeLimpo = nome.trim();
+
+    if (!nomeLimpo) {
         showToast("Informe o nome da tarefa.");
         return;
     }
 
+    if (!matrizAtualId) {
+        showToast("Selecione uma matriz antes de criar uma tarefa.");
+        return;
+    }
+
     try {
-        await requisicaoApi(
+        // Salva a tarefa e recebe o registro criado pela API.
+        const criada = await requisicaoApi(
             `/matrizes/${matrizAtualId}/tarefas-raci`,
             {
                 method: "POST",
-                body: JSON.stringify({ nome: nome.trim() })
+                body: JSON.stringify({ nome: nomeLimpo })
             }
         );
 
-        await carregarDadosRaci(matrizAtualId);
+        // Atualiza os dados locais sem consultar novamente a API.
+        const novaTarefa = {
+            ...criada,
+            data_inicio: criada.data_inicio ?? null,
+            data_fim: criada.data_fim ?? null,
+            status: criada.status ?? "pending"
+        };
+
+        dadosRaci.tarefas.push(novaTarefa);
+
+        // Atualiza somente a interface com os dados já recebidos.
+        renderizarRaci();
+
+        // Atualiza o Gantt apenas se ele compartilhar esta matriz.
+        const seletorGantt = document.getElementById("ganttSelect");
+
+        const graficoAtual = cronogramasUsuario.find(
+            grafico =>
+                String(grafico.id) === String(seletorGantt.value)
+        );
+
+        if (
+            graficoAtual?.matriz_id &&
+            String(graficoAtual.matriz_id) === String(matrizAtualId)
+        ) {
+            await renderizarGanttVinculado();
+        }
+
         showToast("Tarefa criada.");
     } catch (error) {
+        console.error("Erro ao criar tarefa:", error);
         showToast(`Erro ao criar tarefa: ${error.message}`);
     }
 }
+
 
 // Funciona para Gantt independente ou vinculado.
 async function adicionarTarefaGantt(event) {
