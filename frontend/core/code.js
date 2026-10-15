@@ -2383,8 +2383,11 @@ async function renderizarGanttVinculado() {
             // Desenha a barra de acordo com o intervalo definido.
             adicionarBarraDataGantt(linhaTempo, tarefa);
 
-            // ALTERADO: salva o nome e atualiza a linha imediatamente.
+            // Salva o nome e atualiza a linha imediatamente.
+            
+            // Salva o nome e atualiza a linha imediatamente.
             ativarEdicaoDuploClique(
+                nomeTarefa, // Informa o elemento que será editado.
                 async novoNome => {
                     // Recebe a tarefa atualizada e mantém a memória sincronizada.
                     const tarefaAtualizada = await requisicaoApi(
