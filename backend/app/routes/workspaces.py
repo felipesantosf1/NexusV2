@@ -374,6 +374,101 @@ def listar_integrantes(
 
     return membros
 
+# Remover um integrante do espaço de trabalho.
+@router.delete(
+    "/{workspace_id}/members/{usuario_id}",
+    status_code=204,
+)
+def remover_integrante(
+    workspace_id: UUID,
+    usuario_id: UUID,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    # Somente proprietários e administradores podem remover integrantes.
+    papel_solicitante = obter_papel(
+        cursor,
+        workspace_id,
+        usuario["id"],
+    )
+
+    if papel_solicitante not in ("owner", "admin"):
+        cursor.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Você não tem permissão para remover integrantes.",
+        )
+
+    # Busca o integrante e verifica se ele é o proprietário.
+    cursor.execute(
+        """
+        SELECT
+            wm.papel,
+            w.owner_id
+        FROM public.workspace_members AS wm
+        JOIN public.workspaces AS w
+            ON w.id = wm.workspace_id
+        WHERE wm.workspace_id = %s
+        AND wm.usuario_id = %s
+        FOR UPDATE OF wm;
+        """,
+        [str(workspace_id), str(usuario_id)],
+    )
+
+    integrante = cursor.fetchone()
+
+    if not integrante:
+        cursor.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Integrante não encontrado neste espaço.",
+        )
+
+    # Impede remover a própria conta por esta função.
+    if str(usuario_id) == str(usuario["id"]):
+        cursor.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Você não pode remover sua própria conta por esta opção.",
+        )
+
+    # O proprietário do espaço nunca pode ser removido por esta rota.
+    if (
+        integrante["papel"] == "owner"
+        or str(integrante["owner_id"]) == str(usuario_id)
+    ):
+        cursor.close()
+        raise HTTPException(
+            status_code=400,
+            detail="O proprietário do espaço não pode ser removido.",
+        )
+
+    # Um administrador não pode remover outro administrador.
+    if (
+        integrante["papel"] == "admin"
+        and papel_solicitante != "owner"
+    ):
+        cursor.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Somente o proprietário pode remover outro administrador.",
+        )
+
+    cursor.execute(
+        """
+        DELETE FROM public.workspace_members
+        WHERE workspace_id = %s
+        AND usuario_id = %s;
+        """,
+        [str(workspace_id), str(usuario_id)],
+    )
+
+    dados.commit()
+    cursor.close()
+
+    return None
 
 # Criar um convite de uso único, válido por sete dias.
 @router.post("/{workspace_id}/invites", status_code=201)

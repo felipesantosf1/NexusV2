@@ -3201,6 +3201,253 @@ async function copiarLinkConvite() {
     }
 }
 
+// GERENCIAR INTEGRANTES DO ESPAÇO DE TRABALHO
+
+function garantirPainelEquipe() {
+    let overlay = document.getElementById("workspaceMembersOverlay");
+
+    if (overlay) return overlay;
+
+    overlay = document.createElement("div");
+    overlay.id = "workspaceMembersOverlay";
+    overlay.className = "workspace-invite-overlay";
+    overlay.hidden = true;
+
+    overlay.innerHTML = `
+        <section
+            class="workspace-invite-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workspaceMembersTitle"
+        >
+            <button
+                type="button"
+                class="workspace-invite-close"
+                id="workspaceMembersClose"
+                aria-label="Fechar"
+            >&times;</button>
+
+            <div class="workspace-invite-icon">
+                <i class="fa-solid fa-people-group"></i>
+            </div>
+
+            <h2 id="workspaceMembersTitle">Gerenciar equipe</h2>
+
+            <p class="workspace-invite-description">
+                Veja quem participa deste espaço de trabalho
+                e remova integrantes quando necessário.
+            </p>
+
+            <div
+                id="workspaceMembersList"
+                class="workspace-members-list"
+            ></div>
+
+            <p
+                id="workspaceMembersFeedback"
+                class="workspace-invite-feedback"
+                role="status"
+                aria-live="polite"
+            ></p>
+        </section>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const fechar = () => {
+        overlay.hidden = true;
+    };
+
+    overlay.querySelector("#workspaceMembersClose")
+        .addEventListener("click", fechar);
+
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) fechar();
+    });
+
+    return overlay;
+}
+
+
+function renderizarListaEquipe(
+    overlay,
+    integrantes,
+    usuarioAtualId
+) {
+    const lista = overlay.querySelector("#workspaceMembersList");
+    const feedback = overlay.querySelector("#workspaceMembersFeedback");
+
+    lista.replaceChildren();
+
+    const papelAtual = workspaceAtual?.papel;
+    const podeGerenciar = ["owner", "admin"].includes(papelAtual);
+    const ehProprietario = papelAtual === "owner";
+
+    if (!integrantes.length) {
+        feedback.textContent = "Nenhum integrante encontrado.";
+        return;
+    }
+
+    integrantes.forEach(integrante => {
+        const linha = document.createElement("div");
+        linha.className = "workspace-member-manage-row";
+
+        const nome = integrante.nome || integrante.email || "Usuário";
+
+        const iniciais = nome
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(parte => parte[0].toUpperCase())
+            .join("") || "U";
+
+        const avatar = document.createElement("span");
+        avatar.className = "avatar avatar-blue workspace-member-manage-avatar";
+        avatar.textContent = iniciais;
+        avatar.setAttribute("aria-hidden", "true");
+
+        const informacoes = document.createElement("div");
+        informacoes.className = "workspace-member-manage-info";
+
+        const nomeElemento = document.createElement("strong");
+        nomeElemento.textContent = nome;
+
+        const emailElemento = document.createElement("small");
+        emailElemento.textContent = integrante.email || "";
+
+        const rotulosPapel = {
+            owner: "Proprietário",
+            admin: "Administrador",
+            member: "Integrante"
+        };
+
+        const papelElemento = document.createElement("span");
+        papelElemento.className = "workspace-member-manage-role";
+        papelElemento.textContent =
+            rotulosPapel[integrante.papel] || "Integrante";
+
+        informacoes.append(
+            nomeElemento,
+            emailElemento,
+            papelElemento
+        );
+
+        linha.append(avatar, informacoes);
+
+        const ehProprioUsuario =
+            String(integrante.usuario_id) === String(usuarioAtualId);
+
+        const ehProprietarioAlvo =
+            integrante.papel === "owner";
+
+        const ehOutroAdministrador =
+            integrante.papel === "admin" && !ehProprietario;
+
+        const podeRemoverEsteIntegrante =
+            podeGerenciar &&
+            !ehProprioUsuario &&
+            !ehProprietarioAlvo &&
+            !ehOutroAdministrador;
+
+        if (podeRemoverEsteIntegrante) {
+            const botaoRemover = document.createElement("button");
+            botaoRemover.type = "button";
+            botaoRemover.className = "workspace-member-remove";
+            botaoRemover.textContent = "Remover";
+            botaoRemover.title = `Remover ${nome} deste espaço`;
+
+            botaoRemover.addEventListener("click", async () => {
+                const confirmado = confirm(
+                    `Remover ${nome} deste espaço de trabalho?\n\n` +
+                    "A pessoa perderá o acesso a este espaço, " +
+                    "mas a conta dela continuará existindo."
+                );
+
+                if (!confirmado) return;
+
+                botaoRemover.disabled = true;
+                feedback.textContent = `Removendo ${nome}...`;
+
+                try {
+                    await requisicaoApi(
+                        `/workspaces/${workspaceAtualId}/members/` +
+                        encodeURIComponent(integrante.usuario_id),
+                        { method: "DELETE" }
+                    );
+
+                    // Atualiza imediatamente os avatares do topo.
+                    await carregarMembrosWorkspace();
+
+                    showToast(`${nome} foi removido do espaço.`);
+
+                    // Atualiza a lista aberta no painel.
+                    await abrirGerenciadorEquipe();
+                } catch (error) {
+                    console.error("Erro ao remover integrante:", error);
+                    feedback.textContent =
+                        `Não foi possível remover ${nome}: ${error.message}`;
+
+                    botaoRemover.disabled = false;
+                }
+            });
+
+            linha.appendChild(botaoRemover);
+        }
+
+        lista.appendChild(linha);
+    });
+
+    feedback.textContent = podeGerenciar
+        ? "Você pode remover integrantes deste espaço."
+        : "Somente o proprietário ou um administrador pode remover integrantes.";
+}
+
+
+async function abrirGerenciadorEquipe() {
+    if (!workspaceAtualId || !workspaceAtual) {
+        showToast("Selecione um espaço de trabalho primeiro.");
+        return;
+    }
+
+    const overlay = garantirPainelEquipe();
+    const lista = overlay.querySelector("#workspaceMembersList");
+    const feedback = overlay.querySelector("#workspaceMembersFeedback");
+
+    overlay.hidden = false;
+    lista.replaceChildren();
+    feedback.textContent = "Carregando integrantes...";
+
+    try {
+        const { data, error } = await supabaseClient.auth.getUser();
+
+        if (error) throw error;
+
+        if (!data.user) {
+            throw new Error("Sua sessão expirou. Entre novamente.");
+        }
+
+        const integrantes = await requisicaoApi(
+            `/workspaces/${workspaceAtualId}/members`
+        );
+
+        membrosWorkspace = integrantes;
+
+        renderizarMembrosWorkspace();
+        atualizarCabecalhoWorkspace();
+
+        renderizarListaEquipe(
+            overlay,
+            integrantes,
+            data.user.id
+        );
+    } catch (error) {
+        console.error("Erro ao carregar equipe:", error);
+        feedback.textContent =
+            `Não foi possível carregar a equipe: ${error.message}`;
+    }
+}
+
 // AÇÕES DA INTERFACE
 document.querySelectorAll("[data-demo-action]").forEach(botao => {
     const acao = botao.dataset.demoAction;
@@ -3217,6 +3464,16 @@ document.querySelectorAll("[data-demo-action]").forEach(botao => {
             }
         });
 
+    } else if (acao === "equipe") {
+        botao.addEventListener("click", async () => {
+            try {
+                await abrirGerenciadorEquipe();
+            } catch (error) {
+                console.error("Erro ao abrir o gerenciador da equipe:", error);
+                showToast(error.message);
+            }
+        }); 
+        
     } else if (acao === "nova-matriz") {
         botao.addEventListener("click", async () => {
             // Campo personalizado junto ao botão Nova matriz.
