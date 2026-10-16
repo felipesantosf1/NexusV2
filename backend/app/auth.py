@@ -99,6 +99,7 @@ def validar_token_legado(
         ) from erro
 
 
+# VALIDAÇÃO DE SESSÃO: JWT LOCAL QUANDO A CHAVE É ASSIMÉTRICA
 def get_current_user(
     credenciais: HTTPAuthorizationCredentials | None = Depends(
         esquema_bearer
@@ -119,11 +120,83 @@ def get_current_user(
             detail="SUPABASE_URL ou SUPABASE_PUBLISHABLE_KEY não configurada.",
         )
 
-    # O Supabase verifica o token e devolve o usuário autenticado.
-    return validar_token_legado(
-        credenciais.credentials,
-        supabase_url,
-        supabase_key,
-    )
+    token = credenciais.credentials
 
-    
+    # Identifica o algoritmo usado para assinar o token.
+    try:
+        cabecalho = jwt.get_unverified_header(token)
+    except InvalidTokenError as erro:
+        raise HTTPException(
+            status_code=401,
+            detail="Token de sessão inválido.",
+        ) from erro
+
+    algoritmo = cabecalho.get("alg")
+
+    # Tokens HS256 antigos continuam usando a validação do Supabase Auth.
+    if algoritmo == "HS256":
+        return validar_token_legado(
+            token,
+            supabase_url,
+            supabase_key,
+        )
+
+    # Aceita somente os algoritmos assimétricos previstos.
+    if algoritmo not in ("ES256", "RS256"):
+        raise HTTPException(
+            status_code=401,
+            detail="Algoritmo de assinatura não permitido.",
+        )
+
+    # Busca a chave pública e verifica a assinatura do JWT.
+    try:
+        cliente_jwks = obter_cliente_jwks(supabase_url)
+        chave = cliente_jwks.get_signing_key_from_jwt(token)
+
+    except PyJWKClientConnectionError as erro:
+        raise HTTPException(
+            status_code=503,
+            detail="Não foi possível acessar as chaves públicas do Supabase.",
+        ) from erro
+
+    except PyJWKClientError as erro:
+        raise HTTPException(
+            status_code=401,
+            detail="Não foi possível validar a assinatura do token.",
+        ) from erro
+
+    # Valida assinatura, validade, emissor e destinatário do token.
+    try:
+        claims = jwt.decode(
+            token,
+            chave.key,
+            algorithms=[algoritmo],
+            audience="authenticated",
+            issuer=f"{supabase_url.rstrip('/')}/auth/v1",
+            options={
+                "require": ["exp", "sub", "aud", "iss"],
+            },
+        )
+
+        if claims.get("role") != "authenticated":
+            raise HTTPException(
+                status_code=401,
+                detail="O token não pertence a uma sessão autenticada.",
+            )
+
+        # Mantém o formato de usuário esperado pelas rotas existentes.
+        return {
+            "id": UUID(claims["sub"]),
+        }
+
+    except InvalidTokenError as erro:
+        raise HTTPException(
+            status_code=401,
+            detail="Sessão inválida ou expirada.",
+        ) from erro
+
+    except (KeyError, ValueError, TypeError) as erro:
+        raise HTTPException(
+            status_code=401,
+            detail="Não foi possível identificar o usuário autenticado.",
+        ) from erro
