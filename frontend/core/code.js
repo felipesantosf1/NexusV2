@@ -412,6 +412,11 @@ async function carregarDadosRaci(matrizId) {
 // EDIÇÃO DE TEXTO COM DUPLO CLIQUE
 function ativarEdicaoDuploClique(elemento, salvar, depoisDeSalvar) {
     elemento.addEventListener("dblclick", () => {
+        if (elemento.dataset.syncPending === "true") {
+            showToast("Aguarde o salvamento antes de editar.");
+            return;
+        }
+
         if (elemento.dataset.editando === "true") return;
 
         elemento.dataset.editando = "true";
@@ -513,6 +518,10 @@ function criarBotaoExcluir(rotulo, acao, desabilitado = false) { // #ALTERADO
 
 // APAGAR TAREFA
 async function excluirTarefa(tarefa) {
+    if (tarefa?._pendente) {
+        showToast("Aguarde o salvamento da tarefa.");
+        return;
+    }
     if (tarefa.is_padrao) {
         showToast("A tarefa padrão não pode ser excluída.");
         return;
@@ -562,6 +571,11 @@ function fecharMenuRaci() {
 }
 
 function abrirMenuRaci(event, tarefa, membro) {
+    if (tarefa?._pendente) {
+        showToast("Aguarde o salvamento da tarefa.");
+        return;
+    }
+
     event.stopPropagation();
     atribuicaoAlvoRaci = { tarefa, membro };
 
@@ -709,7 +723,17 @@ function renderizarRaci() {
 
         nomeTarefa.className = "raci-editable-name";
         nomeTarefa.textContent = tarefa.nome;
-        nomeTarefa.title = "Dê dois cliques para editar";
+
+        nomeTarefa.dataset.syncPending =
+            String(Boolean(tarefa._pendente));
+
+        nomeTarefa.title = tarefa._pendente
+            ? "Salvando tarefa..."
+            : "Dê dois cliques para editar";
+
+        if (tarefa._pendente) {
+            nomeTarefa.style.opacity = "0.6";
+        }
 
         ativarEdicaoDuploClique(
             nomeTarefa,
@@ -852,6 +876,7 @@ seletorMatriz.addEventListener("change", async () => {
 
 // CRIAR TAREFA
 
+// CRIAR TAREFA COM ATUALIZAÇÃO IMEDIATA DA INTERFACE
 async function adicionarTarefa(event) {
     const nome = await abrirDialogoNexus({
         titulo: "Nova tarefa",
@@ -876,30 +901,69 @@ async function adicionarTarefa(event) {
         return;
     }
 
+    const matrizId = String(matrizAtualId);
+
+    // Identificador temporário, usado só na interface.
+    const idTemporario =
+        `pendente-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    const proximaOrdem = dadosRaci.tarefas.reduce(
+        (maior, tarefa) =>
+            Math.max(maior, Number(tarefa.ordem) || 0),
+        0
+    ) + 1;
+
+    const tarefaPendente = {
+        id: idTemporario,
+        matriz_id: matrizId,
+        nome: nomeLimpo,
+        ordem: proximaOrdem,
+        data_inicio: null,
+        data_fim: null,
+        status: "pending",
+        is_padrao: false,
+        _pendente: true
+    };
+
+    // 1. A tarefa aparece antes da resposta do servidor.
+    dadosRaci.tarefas.push(tarefaPendente);
+    renderizarRaci();
+
     try {
-        // Salva a tarefa e recebe o registro criado pela API.
+        // 2. Salva a tarefa na API.
         const criada = await requisicaoApi(
-            `/matrizes/${matrizAtualId}/tarefas-raci`,
+            `/matrizes/${matrizId}/tarefas-raci`,
             {
                 method: "POST",
                 body: JSON.stringify({ nome: nomeLimpo })
             }
         );
 
-        // Atualiza os dados locais sem consultar novamente a API.
-        const novaTarefa = {
-            ...criada,
-            data_inicio: criada.data_inicio ?? null,
-            data_fim: criada.data_fim ?? null,
-            status: criada.status ?? "pending"
-        };
+        // Se o usuário trocou de matriz durante o salvamento,
+        // não alteramos a matriz que agora está aberta.
+        if (String(matrizAtualId) !== matrizId) {
+            showToast("Tarefa salva.");
+            return;
+        }
 
-        dadosRaci.tarefas.push(novaTarefa);
+        const indice = dadosRaci.tarefas.findIndex(
+            tarefa => tarefa.id === idTemporario
+        );
 
-        // Atualiza somente a interface com os dados já recebidos.
+        if (indice !== -1) {
+            // 3. Substitui o item temporário pelo registro real.
+            dadosRaci.tarefas[indice] = {
+                ...criada,
+                data_inicio: criada.data_inicio ?? null,
+                data_fim: criada.data_fim ?? null,
+                status: criada.status ?? "pending",
+                _pendente: false
+            };
+        }
+
         renderizarRaci();
 
-        // Atualiza o Gantt apenas se ele compartilhar esta matriz.
+        // Atualiza também o Gantt se ele usar esta matriz.
         const seletorGantt = document.getElementById("ganttSelect");
 
         const graficoAtual = cronogramasUsuario.find(
@@ -909,20 +973,30 @@ async function adicionarTarefa(event) {
 
         if (
             graficoAtual?.matriz_id &&
-            String(graficoAtual.matriz_id) === String(matrizAtualId)
+            String(graficoAtual.matriz_id) === matrizId
         ) {
             await renderizarGanttVinculado();
         }
 
-        showToast("Tarefa criada.");
+        showToast("Tarefa salva.");
     } catch (error) {
-        console.error("Erro ao criar tarefa:", error);
-        showToast(`Erro ao criar tarefa: ${error.message}`);
+        console.error("Erro ao salvar tarefa:", error);
+
+        // 4. Se falhar, remove a tarefa provisória.
+        if (String(matrizAtualId) === matrizId) {
+            dadosRaci.tarefas = dadosRaci.tarefas.filter(
+                tarefa => tarefa.id !== idTemporario
+            );
+
+            renderizarRaci();
+        }
+
+        showToast(`Não foi possível salvar a tarefa: ${error.message}`);
     }
 }
 
 
-// Funciona para Gantt independente ou vinculado.
+// CRIAR TAREFA GANTT COM EXIBIÇÃO IMEDIATA
 async function adicionarTarefaGantt(event) {
     const seletor = document.getElementById("ganttSelect");
 
@@ -950,39 +1024,111 @@ async function adicionarTarefaGantt(event) {
 
     if (nome === null) return;
 
-    if (!nome.trim()) {
+    const nomeLimpo = nome.trim();
+
+    if (!nomeLimpo) {
         showToast("Informe o nome da tarefa.");
         return;
     }
 
+    // Mostra uma linha provisória enquanto a API salva a tarefa.
+    const idPendente =
+        `gantt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    const coluna = document.querySelector(".gantt-task-column");
+    const timeline = document.querySelector(".gantt-timeline");
+
+    let linhaPendente = null;
+    let linhaTempoPendente = null;
+
+    function mostrarPendente() {
+        if (!coluna || !timeline) return;
+
+        linhaPendente = document.createElement("div");
+        linhaPendente.className = "gantt-task-row";
+        linhaPendente.dataset.syncPendente = "true";
+        linhaPendente.dataset.syncPendenteId = idPendente;
+
+        const grupo = document.createElement("span");
+        grupo.className = "gantt-task-name-group";
+
+        const numero = document.createElement("b");
+        numero.textContent = String(
+            coluna.querySelectorAll(".gantt-task-row").length
+        ).padStart(2, "0");
+
+        const nomeTarefa = document.createElement("span");
+        nomeTarefa.textContent = nomeLimpo;
+        nomeTarefa.style.opacity = "0.6";
+        nomeTarefa.title = "Salvando tarefa...";
+
+        grupo.append(numero, nomeTarefa);
+
+        const acoes = document.createElement("div");
+        acoes.className = "gantt-task-row-actions";
+
+        const status = document.createElement("small");
+        status.textContent = "Salvando...";
+
+        acoes.appendChild(status);
+        linhaPendente.append(grupo, acoes);
+        coluna.appendChild(linhaPendente);
+
+        linhaTempoPendente = document.createElement("div");
+        linhaTempoPendente.className = "gantt-grid-row";
+        linhaTempoPendente.dataset.syncPendente = "true";
+        linhaTempoPendente.dataset.syncPendenteId = idPendente;
+        linhaTempoPendente.style.height =
+            `${linhaPendente.offsetHeight}px`;
+
+        timeline.appendChild(linhaTempoPendente);
+    }
+
+    function removerPendente() {
+        linhaPendente?.remove();
+        linhaTempoPendente?.remove();
+    }
+
+    mostrarPendente();
+
     try {
         if (vinculado) {
-            // Gráfico vinculado: tarefa pertence à matriz RACIS.
+            // O banco registra a tarefa na matriz RACIS vinculada.
             await requisicaoApi(
                 `/matrizes/${cronograma.matriz_id}/tarefas-raci`,
                 {
                     method: "POST",
-                    body: JSON.stringify({ nome: nome.trim() })
+                    body: JSON.stringify({ nome: nomeLimpo })
                 }
             );
 
+            removerPendente();
+
             await carregarDadosRaci(cronograma.matriz_id);
         } else {
-            // Gráfico independente: tarefa pertence ao cronograma.
+            // O banco registra a tarefa no cronograma independente.
             await requisicaoApi(
                 `/cronogramas/${cronograma.id}/tarefas`,
                 {
                     method: "POST",
-                    body: JSON.stringify({ nome: nome.trim() })
+                    body: JSON.stringify({ nome: nomeLimpo })
                 }
             );
+
+            removerPendente();
 
             await renderizarGanttVinculado();
         }
 
-        showToast("Tarefa criada.");
+        showToast("Tarefa salva.");
     } catch (error) {
-        showToast(`Erro ao criar tarefa: ${error.message}`);
+        removerPendente();
+
+        console.error("Erro ao criar tarefa no Gantt:", error);
+
+        showToast(
+            `Não foi possível salvar a tarefa: ${error.message}`
+        );
     }
 }
 
