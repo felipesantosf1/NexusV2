@@ -31,13 +31,18 @@ class AtribuicaoEntrada(BaseModel):
 
 
 
-
-def verificar_matriz(cursor, matriz_id, usuario_id):
+def verificar_matriz(
+    cursor,
+    matriz_id,
+    usuario_id,
+    exigir_edicao=False,
+):
     cursor.execute(
         """
         SELECT
             m.id,
-            m.workspace_id
+            m.workspace_id,
+            wm.papel
         FROM public.matrizes AS m
         INNER JOIN public.workspace_members AS wm
             ON wm.workspace_id = m.workspace_id
@@ -55,10 +60,13 @@ def verificar_matriz(cursor, matriz_id, usuario_id):
             detail="Matriz não encontrada ou usuário sem acesso ao espaço.",
         )
 
+    if exigir_edicao and matriz["papel"] not in ("owner", "editor"):
+        raise HTTPException(
+            status_code=403,
+            detail="Seu acesso é somente para visualização.",
+        )
+
     return matriz
-
-
-
 
 def garantir_itens_padrao(cursor, matriz_id):
     # Cria uma tarefa padrão somente se ainda não existir.
@@ -99,8 +107,17 @@ def listar_dados_raci(
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
-    verificar_matriz(cursor, matriz_id, usuario["id"])
-    garantir_itens_padrao(cursor, matriz_id)
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
+    
+    matriz = verificar_matriz(cursor, matriz_id, usuario["id"])
+
+    if matriz["papel"] in ("owner", "editor"):
+        garantir_itens_padrao(cursor, matriz_id)
 
     cursor.execute(
         """
@@ -166,7 +183,13 @@ def criar_tarefa_raci(
         raise HTTPException(400, "Informe o nome da tarefa.")
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -206,7 +229,12 @@ def editar_tarefa_raci(
         raise HTTPException(400, "Informe o nome da tarefa.")
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -254,7 +282,12 @@ def atualizar_planejamento_raci(
         )
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -299,7 +332,13 @@ def excluir_tarefa_raci(
     usuario=Depends(get_current_user),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -354,7 +393,13 @@ def criar_membro(
         raise HTTPException(400, "Informe o nome do membro.")
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -394,7 +439,13 @@ def editar_membro(
         raise HTTPException(400, "Informe o nome do membro.")
 
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -427,7 +478,13 @@ def excluir_membro(
     usuario=Depends(get_current_user),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -475,7 +532,13 @@ def salvar_atribuicao(
     usuario=Depends(get_current_user),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """
@@ -546,7 +609,13 @@ def excluir_atribuicao(
     usuario=Depends(get_current_user),
 ):
     cursor = dados.cursor(cursor_factory=RealDictCursor)
-    verificar_matriz(cursor, matriz_id, usuario["id"])
+    
+    verificar_matriz(
+        cursor,
+        matriz_id,
+        usuario["id"],
+        exigir_edicao=True,
+    )
 
     cursor.execute(
         """

@@ -7,6 +7,14 @@ from psycopg2.extras import RealDictCursor
 from app.auth import get_current_user
 from app.database import get_db
 
+# Permite alterações somente a proprietários e editores.
+def exigir_edicao(workspace):
+    if workspace.get("papel") not in ("owner", "editor"):
+        raise HTTPException(
+            status_code=403,
+            detail="Seu acesso é somente para visualização.",
+        )
+
 # GARANTIR OS ITENS PADRÃO DE CADA ESPAÇO
 def garantir_itens_padrao_workspace(cursor, workspace_id, usuario_id):
     # Busca a matriz padrão do espaço.

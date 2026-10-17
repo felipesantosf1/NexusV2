@@ -728,6 +728,27 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
     cursor: default;
 }
 
+/* Visualizadores não podem acionar controles de edição. */
+body[data-workspace-role="viewer"] .raci-delete-button,
+body[data-workspace-role="viewer"] .gantt-task-delete,
+body[data-workspace-role="viewer"] .gantt-task-schedule {
+    display: none !important;
+}
+
+body[data-workspace-role="viewer"] .role-badge,
+body[data-workspace-role="viewer"] .gantt-task-status {
+    pointer-events: none;
+}
+
+body[data-workspace-role="viewer"] .raci-editable-name,
+body[data-workspace-role="viewer"] .member-name,
+body[data-workspace-role="viewer"] .gantt-task-name,
+body[data-workspace-role="viewer"] .gantt-task-name-group > span,
+body[data-workspace-role="viewer"] .workspace-name-text {
+    pointer-events: none;
+    cursor: default;
+}
+
 /* FOOTER */
 .app-footer { display: flex; justify-content: space-between; gap: 12px; padding: 22px 2px 4px; color: #5e626e; font-size: 9px; }
 .app-footer span { display: inline-flex; align-items: center; gap: 6px; }

@@ -7,14 +7,14 @@ from psycopg2.extras import RealDictCursor
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.workspace_context import get_current_workspace
+from app.workspace_context import get_current_workspace, exigir_edicao
 from app.schemas.matriz import (
     MatrizCriacao,
     MatrizAtualizacao,
     MatrizResposta,
 )
 
-from app.workspace_context import get_current_workspace
+
 
 router = APIRouter(prefix="/matrizes", tags=["Matrizes"])
 
@@ -51,6 +51,9 @@ def criar_matriz(
     usuario=Depends(get_current_user),
     workspace=Depends(get_current_workspace),
 ):
+
+    exigir_edicao(workspace)
+    
     nome = matriz.nome.strip()
 
     if not nome:
@@ -113,6 +116,8 @@ def atualizar_matriz(
     dados=Depends(get_db),
     workspace=Depends(get_current_workspace),
 ):
+    exigir_edicao(workspace)
+
     nome = matriz_atualizada.nome.strip()
 
     if not nome:
@@ -158,6 +163,9 @@ def excluir_matriz(
     dados=Depends(get_db),
     workspace=Depends(get_current_workspace),
 ):
+
+    exigir_edicao(workspace)
+    
     cursor = dados.cursor(cursor_factory=RealDictCursor)
 
     cursor.execute(

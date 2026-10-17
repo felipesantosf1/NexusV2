@@ -10,7 +10,7 @@
 
 .status-done { background: #37be88; }
 .status-progress { background: #5089f5; }
-.status-pending { background: #575b67; }
+.status-pending { background: #d10707; }
 
 .gantt-demo-table { display: grid; grid-template-columns: 285px minmax(650px, 1fr); min-width: 935px; }
 .gantt-grid-heading, .gantt-months { height: 47px; display: grid; align-items: center; background: #1c1d22; border-bottom: 1px solid #303139; color: #979ba7; font-size: 10px; font-weight: 650; }
@@ -29,7 +29,7 @@
 
 .bar-done { background: #277c5c; }
 .bar-progress { background: #315fae; }
-.bar-pending { background: #444751; }
+.bar-pending { background: #d10707; }
 
 
 /* MENU DE AÇÕES DO GRÁFICO GANTT */

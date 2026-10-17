@@ -1436,6 +1436,30 @@ function alternarMenuWorkspace() {
     }
 }
 
+function aplicarPermissoesWorkspace() {
+    const papel = workspaceAtual?.papel || "viewer";
+
+    document.body.dataset.workspaceRole = papel;
+
+    // Somente o proprietário pode enviar convites.
+    if (inviteButton) {
+        inviteButton.hidden = papel !== "owner";
+    }
+
+    // Visualizadores não recebem os botões de criação.
+    const botoesDeEdicao = document.querySelectorAll(
+        '[data-demo-action="nova-matriz"],' +
+        '[data-demo-action="novo-grafico"],' +
+        '[data-demo-action="nova-tarefa"],' +
+        '[data-demo-action="adicionar-tarefa"],' +
+        '[data-demo-action="adicionar-membro"]'
+    );
+
+    botoesDeEdicao.forEach(botao => {
+        botao.hidden = papel === "viewer";
+    });
+}
+
 async function selecionarWorkspace(workspaceId) {
     const escolhido = workspacesUsuario.find(
         item => String(item.id) === String(workspaceId)
@@ -1447,6 +1471,7 @@ async function selecionarWorkspace(workspaceId) {
 
     workspaceAtual = escolhido;
     workspaceAtualId = String(escolhido.id);
+    aplicarPermissoesWorkspace();
 
     try {
         localStorage.setItem("nexus_workspace_id", workspaceAtualId);
@@ -3279,9 +3304,13 @@ function renderizarListaEquipe(
 
     lista.replaceChildren();
 
-    const papelAtual = workspaceAtual?.papel;
-    const podeGerenciar = ["owner", "admin"].includes(papelAtual);
-    const ehProprietario = papelAtual === "owner";
+    const ehProprietarioAtual = workspaceAtual?.papel === "owner";
+
+    const rotulosPapel = {
+        owner: "Proprietário",
+        editor: "Editor",
+        viewer: "Visualizador"
+    };
 
     if (!integrantes.length) {
         feedback.textContent = "Nenhum integrante encontrado.";
@@ -3303,7 +3332,8 @@ function renderizarListaEquipe(
             .join("") || "U";
 
         const avatar = document.createElement("span");
-        avatar.className = "avatar avatar-blue workspace-member-manage-avatar";
+        avatar.className =
+            "avatar avatar-blue workspace-member-manage-avatar";
         avatar.textContent = iniciais;
         avatar.setAttribute("aria-hidden", "true");
 
@@ -3316,55 +3346,118 @@ function renderizarListaEquipe(
         const emailElemento = document.createElement("small");
         emailElemento.textContent = integrante.email || "";
 
-        const rotulosPapel = {
-            owner: "Proprietário",
-            admin: "Administrador",
-            member: "Integrante"
-        };
-
         const papelElemento = document.createElement("span");
         papelElemento.className = "workspace-member-manage-role";
         papelElemento.textContent =
             rotulosPapel[integrante.papel] || "Integrante";
 
-        informacoes.append(
-            nomeElemento,
-            emailElemento,
-            papelElemento
-        );
-
+        informacoes.append(nomeElemento, emailElemento, papelElemento);
         linha.append(avatar, informacoes);
 
         const ehProprioUsuario =
             String(integrante.usuario_id) === String(usuarioAtualId);
 
-        const ehProprietarioAlvo =
-            integrante.papel === "owner";
+        const ehProprietarioPrincipal =
+            String(integrante.usuario_id) ===
+            String(workspaceAtual?.owner_id);
 
-        const ehOutroAdministrador =
-            integrante.papel === "admin" && !ehProprietario;
+        // Apenas proprietários podem alterar os papéis.
+        if (ehProprietarioAtual && !ehProprioUsuario && !ehProprietarioPrincipal) {
+            const controles = document.createElement("div");
+            controles.className = "workspace-member-role-controls";
 
-        const podeRemoverEsteIntegrante =
-            podeGerenciar &&
+            const seletor = document.createElement("select");
+            seletor.className = "workspace-member-role-select";
+            seletor.setAttribute(
+                "aria-label",
+                `Permissão de ${nome}`
+            );
+
+            Object.entries(rotulosPapel).forEach(([valor, rotulo]) => {
+                const opcao = document.createElement("option");
+                opcao.value = valor;
+                opcao.textContent = rotulo;
+                seletor.appendChild(opcao);
+            });
+
+            seletor.value = integrante.papel;
+
+            const botaoSalvar = document.createElement("button");
+            botaoSalvar.type = "button";
+            botaoSalvar.className = "workspace-member-save-role";
+            botaoSalvar.textContent = "Salvar";
+            botaoSalvar.disabled = true;
+
+            seletor.addEventListener("change", () => {
+                botaoSalvar.disabled =
+                    seletor.value === integrante.papel;
+            });
+
+            botaoSalvar.addEventListener("click", async () => {
+                const novoPapel = seletor.value;
+
+                if (novoPapel === integrante.papel) return;
+
+                if (!confirm(
+                    `Alterar a permissão de ${nome} para ` +
+                    `${rotulosPapel[novoPapel]}?`
+                )) {
+                    seletor.value = integrante.papel;
+                    botaoSalvar.disabled = true;
+                    return;
+                }
+
+                seletor.disabled = true;
+                botaoSalvar.disabled = true;
+                feedback.textContent = `Atualizando permissão de ${nome}...`;
+
+                try {
+                    await requisicaoApi(
+                        `/workspaces/${workspaceAtualId}/members/` +
+                        `${encodeURIComponent(integrante.usuario_id)}/role`,
+                        {
+                            method: "PUT",
+                            body: JSON.stringify({ papel: novoPapel })
+                        }
+                    );
+
+                    await abrirGerenciadorEquipe();
+                    await carregarMembrosWorkspace();
+
+                    showToast(`Permissão de ${nome} atualizada.`);
+                } catch (error) {
+                    console.error("Erro ao alterar permissão:", error);
+
+                    feedback.textContent =
+                        `Não foi possível alterar a permissão: ${error.message}`;
+
+                    seletor.disabled = false;
+                    seletor.value = integrante.papel;
+                }
+            });
+
+            controles.append(seletor, botaoSalvar);
+            linha.appendChild(controles);
+        }
+
+        // Só proprietários removem integrantes comuns.
+        const podeRemover =
+            ehProprietarioAtual &&
             !ehProprioUsuario &&
-            !ehProprietarioAlvo &&
-            !ehOutroAdministrador;
+            integrante.papel !== "owner" &&
+            !ehProprietarioPrincipal;
 
-        if (podeRemoverEsteIntegrante) {
+        if (podeRemover) {
             const botaoRemover = document.createElement("button");
             botaoRemover.type = "button";
             botaoRemover.className = "workspace-member-remove";
             botaoRemover.textContent = "Remover";
-            botaoRemover.title = `Remover ${nome} deste espaço`;
 
             botaoRemover.addEventListener("click", async () => {
-                const confirmado = confirm(
+                if (!confirm(
                     `Remover ${nome} deste espaço de trabalho?\n\n` +
-                    "A pessoa perderá o acesso a este espaço, " +
-                    "mas a conta dela continuará existindo."
-                );
-
-                if (!confirmado) return;
+                    "A conta continuará existindo, mas perderá acesso a este espaço."
+                )) return;
 
                 botaoRemover.disabled = true;
                 feedback.textContent = `Removendo ${nome}...`;
@@ -3376,13 +3469,10 @@ function renderizarListaEquipe(
                         { method: "DELETE" }
                     );
 
-                    // Atualiza imediatamente os avatares do topo.
+                    await abrirGerenciadorEquipe();
                     await carregarMembrosWorkspace();
 
                     showToast(`${nome} foi removido do espaço.`);
-
-                    // Atualiza a lista aberta no painel.
-                    await abrirGerenciadorEquipe();
                 } catch (error) {
                     console.error("Erro ao remover integrante:", error);
                     feedback.textContent =
@@ -3398,9 +3488,9 @@ function renderizarListaEquipe(
         lista.appendChild(linha);
     });
 
-    feedback.textContent = podeGerenciar
-        ? "Você pode remover integrantes deste espaço."
-        : "Somente o proprietário ou um administrador pode remover integrantes.";
+    feedback.textContent = ehProprietarioAtual
+        ? "Você pode alterar permissões e remover integrantes."
+        : "Você pode visualizar os integrantes deste espaço.";
 }
 
 

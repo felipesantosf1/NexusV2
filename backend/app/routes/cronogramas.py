@@ -9,7 +9,7 @@ from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.workspace_context import get_current_workspace
+from app.workspace_context import get_current_workspace, exigir_edicao
 
 
 router = APIRouter(prefix="/cronogramas", tags=["Cronogramas"])
@@ -188,8 +188,8 @@ def atualizar_vinculo(
             SELECT id
             FROM public.cronogramas
             WHERE matriz_id = %s
-              AND workspace_id = %s
-              AND id <> %s;
+            AND workspace_id = %s
+            AND id <> %s;
             """,
             [str(entrada.matriz_id), workspace_id, str(cronograma_id)],
         )

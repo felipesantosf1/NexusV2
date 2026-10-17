@@ -161,6 +161,30 @@
                 membrosWorkspace = membrosNovos;
                 renderizarMembrosWorkspace();
                 atualizarCabecalhoWorkspace();
+
+                // Atualiza a permissão do usuário nesta sessão.
+                const { data: sessaoAtual } =
+                    await supabaseClient.auth.getSession();
+
+                const usuarioAtualId = sessaoAtual.session?.user?.id;
+
+                const integranteAtual = membrosNovos.find(
+                    membro =>
+                        String(membro.usuario_id) === String(usuarioAtualId)
+                );
+
+                if (
+                    integranteAtual &&
+                    workspaceAtual &&
+                    integranteAtual.papel !== workspaceAtual.papel
+                ) {
+                    workspaceAtual = {
+                        ...workspaceAtual,
+                        papel: integranteAtual.papel
+                    };
+
+                    aplicarPermissoesWorkspace();
+                }
             }
 
             // 2. Matrizes criadas, removidas ou renomeadas.

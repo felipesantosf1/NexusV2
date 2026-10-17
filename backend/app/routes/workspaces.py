@@ -2,6 +2,7 @@
 import hashlib
 import secrets
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -22,6 +23,8 @@ class WorkspaceCriacao(BaseModel):
 class WorkspaceAtualizacao(BaseModel):
     nome: str = Field(min_length=1, max_length=100)
 
+class WorkspacePapelAtualizacao(BaseModel):
+    papel: Literal["owner", "editor", "viewer"]
 
 def obter_papel(cursor, workspace_id, usuario_id):
     cursor.execute(
@@ -48,10 +51,10 @@ def obter_papel(cursor, workspace_id, usuario_id):
 def exigir_administrador(cursor, workspace_id, usuario_id):
     papel = obter_papel(cursor, workspace_id, usuario_id)
 
-    if papel not in ("owner", "admin"):
+    if papel != "owner":
         raise HTTPException(
             status_code=403,
-            detail="Somente o proprietário ou um administrador pode executar esta ação.",
+            detail="Somente proprietários podem administrar este espaço.",
         )
 
 
@@ -194,12 +197,18 @@ def excluir_workspace(
 
     cursor.execute(
         """
-        SELECT owner_id, is_default
-        FROM public.workspaces
-        WHERE id = %s
-        FOR UPDATE;
+        SELECT
+            w.owner_id,
+            w.is_default,
+            wm.papel
+        FROM public.workspaces AS w
+        JOIN public.workspace_members AS wm
+            ON wm.workspace_id = w.id
+        WHERE w.id = %s
+        AND wm.usuario_id = %s
+        FOR UPDATE OF w;
         """,
-        [str(workspace_id)],
+        [str(workspace_id), str(usuario["id"])],
     )
 
     workspace = cursor.fetchone()
@@ -212,11 +221,11 @@ def excluir_workspace(
         )
 
     # Somente o proprietário pode excluir o espaço.
-    if str(workspace["owner_id"]) != str(usuario["id"]):
+    if workspace["papel"] != "owner":
         cursor.close()
         raise HTTPException(
             status_code=403,
-            detail="Somente o proprietário pode excluir este espaço.",
+            detail="Somente proprietários podem excluir este espaço.",
         )
 
     # O espaço padrão é necessário para a inicialização da conta.
@@ -374,6 +383,129 @@ def listar_integrantes(
 
     return membros
 
+# Alterar a permissão de um integrante.
+@router.put("/{workspace_id}/members/{usuario_id}/role")
+def alterar_papel_integrante(
+    workspace_id: UUID,
+    usuario_id: UUID,
+    entrada: WorkspacePapelAtualizacao,
+    dados=Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    cursor = dados.cursor(cursor_factory=RealDictCursor)
+
+    # Bloqueia alterações concorrentes nas permissões do mesmo espaço.
+    cursor.execute(
+        """
+        SELECT owner_id
+        FROM public.workspaces
+        WHERE id = %s
+        FOR UPDATE;
+        """,
+        [str(workspace_id)],
+    )
+
+    workspace = cursor.fetchone()
+
+    if not workspace:
+        cursor.close()
+        raise HTTPException(404, "Espaço de trabalho não encontrado.")
+
+    papel_solicitante = obter_papel(
+        cursor,
+        workspace_id,
+        usuario["id"],
+    )
+
+    if papel_solicitante != "owner":
+        cursor.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Somente proprietários podem alterar permissões.",
+        )
+
+    if str(usuario_id) == str(usuario["id"]):
+        cursor.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Você não pode alterar sua própria permissão.",
+        )
+
+    cursor.execute(
+        """
+        SELECT papel
+        FROM public.workspace_members
+        WHERE workspace_id = %s
+        AND usuario_id = %s
+        FOR UPDATE;
+        """,
+        [str(workspace_id), str(usuario_id)],
+    )
+
+    integrante = cursor.fetchone()
+
+    if not integrante:
+        cursor.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Integrante não encontrado neste espaço.",
+        )
+
+    novo_papel = entrada.papel
+
+    # O proprietário principal não pode ser rebaixado.
+    if (
+        str(usuario_id) == str(workspace["owner_id"])
+        and novo_papel != "owner"
+    ):
+        cursor.close()
+        raise HTTPException(
+            status_code=400,
+            detail="O proprietário principal não pode ser rebaixado.",
+        )
+
+    # Não permite rebaixar o último proprietário restante.
+    if (
+        integrante["papel"] == "owner"
+        and novo_papel != "owner"
+    ):
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM public.workspace_members
+            WHERE workspace_id = %s
+            AND papel = 'owner'
+            AND usuario_id <> %s;
+            """,
+            [str(workspace_id), str(usuario_id)],
+        )
+
+        outros_proprietarios = cursor.fetchone()["total"]
+
+        if outros_proprietarios == 0:
+            cursor.close()
+            raise HTTPException(
+                status_code=400,
+                detail="O espaço precisa manter pelo menos um proprietário.",
+            )
+
+    cursor.execute(
+        """
+        UPDATE public.workspace_members
+        SET papel = %s
+        WHERE workspace_id = %s
+        AND usuario_id = %s
+        RETURNING usuario_id, papel;
+        """,
+        [novo_papel, str(workspace_id), str(usuario_id)],
+    )
+
+    resultado = cursor.fetchone()
+    dados.commit()
+    cursor.close()
+
+    return resultado
+
 # Remover um integrante do espaço de trabalho.
 @router.delete(
     "/{workspace_id}/members/{usuario_id}",
@@ -394,7 +526,7 @@ def remover_integrante(
         usuario["id"],
     )
 
-    if papel_solicitante not in ("owner", "admin"):
+    if papel_solicitante != "owner":
         cursor.close()
         raise HTTPException(
             status_code=403,
@@ -555,7 +687,7 @@ def aceitar_convite(
         """
         INSERT INTO public.workspace_members
             (workspace_id, usuario_id, papel)
-        VALUES (%s, %s, 'member')
+        VALUES (%s, %s, 'editor')
         ON CONFLICT (workspace_id, usuario_id)
         DO NOTHING;
         """,
