@@ -695,6 +695,39 @@ h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.7px; font-weight: 700; 
     cursor: wait;
 }
 
+/* CONTROLES DE PERMISSÃO DA EQUIPE */
+.workspace-member-role-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 115px;
+}
+
+.workspace-member-role-select {
+    width: 100%;
+    padding: 7px;
+    border: 1px solid var(--border, #303746);
+    border-radius: 7px;
+    background: var(--surface, #10151e);
+    color: var(--text, #f1f5f9);
+    font-size: 10px;
+}
+
+.workspace-member-save-role {
+    padding: 7px 9px;
+    border: 1px solid var(--border, #303746);
+    border-radius: 7px;
+    background: var(--surface-hover, #293142);
+    color: var(--text, #f1f5f9);
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.workspace-member-save-role:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 /* FOOTER */
 .app-footer { display: flex; justify-content: space-between; gap: 12px; padding: 22px 2px 4px; color: #5e626e; font-size: 9px; }
 .app-footer span { display: inline-flex; align-items: center; gap: 6px; }
