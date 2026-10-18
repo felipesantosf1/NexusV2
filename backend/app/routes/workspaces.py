@@ -1,30 +1,25 @@
-
 import hashlib
 import secrets
 from uuid import UUID
-from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.workspace_context import (garantir_espaco_padrao, garantir_itens_padrao_workspace)
+from app.workspace_context import (
+    garantir_espaco_padrao,
+    garantir_itens_padrao_workspace,
+)
+from app.schemas.workspace import (
+    WorkspaceCriacao,
+    WorkspaceAtualizacao,
+    WorkspacePapelAtualizacao,
+)
 
 
 router = APIRouter(prefix="/workspaces", tags=["Espaços de trabalho"])
 
-
-class WorkspaceCriacao(BaseModel):
-    nome: str = Field(min_length=1, max_length=100)
-
-
-class WorkspaceAtualizacao(BaseModel):
-    nome: str = Field(min_length=1, max_length=100)
-
-class WorkspacePapelAtualizacao(BaseModel):
-    papel: Literal["owner", "editor", "viewer"]
 
 def obter_papel(cursor, workspace_id, usuario_id):
     cursor.execute(
