@@ -1,37 +1,19 @@
-
-from datetime import date
-from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
 from app.database import get_db
 from app.workspace_context import get_current_workspace, exigir_edicao
-
+from app.schemas.cronograma import (
+    CronogramaCriacao,
+    CronogramaAtualizacao,
+    PlanejamentoTarefaAtualizacao,
+    VinculoCronograma,
+)
 
 router = APIRouter(prefix="/cronogramas", tags=["Cronogramas"])
-
-
-class CronogramaCriacao(BaseModel):
-    nome: str = Field(min_length=1, max_length=100)
-
-
-class CronogramaAtualizacao(BaseModel):
-    nome: str = Field(min_length=1, max_length=100)
-
-
-class PlanejamentoTarefaAtualizacao(BaseModel):
-    data_inicio: date | None = None
-    data_fim: date | None = None
-    status: Literal["pending", "in_progress", "done"] = "pending"
-
-
-class VinculoCronograma(BaseModel):
-    matriz_id: UUID | None = None
-
 
 # Lista somente os cronogramas do espaço atual.
 @router.get("/")

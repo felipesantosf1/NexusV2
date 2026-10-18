@@ -1,34 +1,17 @@
-
-from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
 from app.auth import get_current_user
-
 from app.database import get_db
-from datetime import date
+from app.schemas.raci import (
+    NomeEntrada,
+    PlanejamentoTarefaEntrada,
+    AtribuicaoEntrada,
+)
 
 router = APIRouter(tags=["Matriz RACIS"])
-
-
-class NomeEntrada(BaseModel):
-    nome: str = Field(min_length=1, max_length=150)
-
-
-class PlanejamentoTarefaEntrada(BaseModel):
-    data_inicio: date | None = None
-    data_fim: date | None = None
-    status: Literal["pending", "in_progress", "done"] = "pending"
-
-
-class AtribuicaoEntrada(BaseModel):
-    tarefa_id: UUID
-    membro_id: UUID
-    papel: Literal["R", "A", "C", "I", "S"]
-
 
 
 def verificar_matriz(
