@@ -14,10 +14,7 @@ from app.schemas.matriz import (
     MatrizResposta,
 )
 
-
-
 router = APIRouter(prefix="/matrizes", tags=["Matrizes"])
-
 
 # Lista somente as matrizes do espaço atual.
 @router.get("/", response_model=List[MatrizResposta])

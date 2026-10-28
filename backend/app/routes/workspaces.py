@@ -17,9 +17,7 @@ from app.schemas.workspace import (
     WorkspacePapelAtualizacao,
 )
 
-
 router = APIRouter(prefix="/workspaces", tags=["Espaços de trabalho"])
-
 
 def obter_papel(cursor, workspace_id, usuario_id):
     cursor.execute(

@@ -13,7 +13,6 @@ from app.schemas.raci import (
 
 router = APIRouter(tags=["Matriz RACIS"])
 
-
 def verificar_matriz(
     cursor,
     matriz_id,
